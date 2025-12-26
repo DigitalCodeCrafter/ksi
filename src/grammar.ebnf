@@ -1,0 +1,26 @@
+
+Program     = { Statement };
+
+(* Statements *)
+Statement   = LetStmt | ExprStmt;
+
+LetStmt     = "let", Identifier, "=", Expression, Terminator;
+ExprStmt    = Expression, Terminator;
+
+Terminator  = ";" | Newline;
+
+(* Expressions *)
+Expression = PrattExpr;
+
+(* Expression forms *)
+nud = Number
+    | Identifier
+    | "(", Expression, ")"
+    | "-", Expression
+    ;
+
+led = "+", Expression
+    | "-", Expression
+    | "*", Expression
+    | "/", Expression
+    ;

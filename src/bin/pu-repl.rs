@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Write};
 
-use ksi::{evaluation::{Dimension, Quantity, eval_expression}, lexer::Lexer, parser::Parser};
+use {evaluation::{Dimension, Quantity, eval_expression}, lexer::Lexer, parser::Parser};
 
 fn main() {
     let mut env = HashMap::new();
@@ -43,8 +43,7 @@ fn add_units(env: &mut HashMap<String, Quantity>) {
     env.insert("kg".to_string(), Quantity { value: 1.0, dim: Dimension { l: 0, t: 0, m: 1 } });
 }
 
-mod ksi {
-    pub mod lexer {
+pub mod lexer {
 use std::iter::Peekable;
 
 #[derive(Debug, Clone)]
@@ -162,9 +161,8 @@ impl<I: Iterator<Item = char>> Lexer<I> {
         }
     }
 }
-
-    }
-    pub mod parser {
+}
+pub mod parser {
 use std::iter::Peekable;
 use super::lexer::Token;
 
@@ -231,9 +229,8 @@ impl<I: Iterator<Item = Token>> Parser<I> {
         }
     }
 }
-
-    }
-    pub mod evaluation {
+}
+pub mod evaluation {
 use std::{collections::HashMap, fmt::Display};
 
 use super::{lexer::Token, parser::Expression};
@@ -329,6 +326,4 @@ pub fn eval_expression(node: &Expression, env: &mut HashMap<String, Quantity>) -
         }
     }
 }
-
-    }
 }
