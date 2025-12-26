@@ -219,47 +219,40 @@ impl Lexer<'_> {
 
 // Streaming
 
+// Safe wrapper for storing lexer position
+// (avoids setting the lexer into a token or into a utf8-char)
+#[derive(Debug, Clone, Copy)]
+pub struct LexerPosition(usize);
+
 pub struct TokenStream<'a> {
     lexer: Lexer<'a>,
     done: bool,
-
-    // position restoration
-    save: usize,        // used for go_back
-    restore_pos: usize, // used for public methods
 }
 
 impl<'a> TokenStream<'a> {
     pub fn new(input: &'a str) -> Self {
-        Self { lexer: Lexer::new(input), save: 0, restore_pos: 0, done: false }
+        Self { lexer: Lexer::new(input), done: false }
     }
 
     pub fn from_lexer(lexer: Lexer<'a>) -> Self {
-        Self { lexer, save: 0, restore_pos: 0, done: false }
+        Self { lexer, done: false }
     }
 
     pub fn get_src(&self) -> &'a str {
         self.lexer.input
     }
 
-    pub fn save_position(&mut self) {
-        self.restore_pos = self.lexer.pos
+    pub fn get_position(&mut self) -> LexerPosition {
+        LexerPosition(self.lexer.pos)
     }
 
-    pub fn restore_position(&mut self) {
-        self.lexer.pos = self.restore_pos;
+    pub fn set_position(&mut self, pos: LexerPosition) {
+        self.lexer.pos = pos.0;
         self.done = false;
-    }
-
-    pub fn go_back(&mut self) -> bool {
-        let worked = self.save != self.lexer.pos;
-        self.lexer.pos = self.save;
-        worked
     }
 
     pub fn next_with(&mut self, hint: LexHint) -> Option<Token> {
         if self.done { return None; }
-
-        self.save = self.lexer.pos;
 
         let tok = self.lexer.next_token(hint);
 

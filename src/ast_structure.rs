@@ -35,7 +35,7 @@ pub enum ExprKind<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinaryOp {
-    Assign,
+    // Assign,
     Add,
     Sub,
     Mul,

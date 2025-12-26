@@ -64,10 +64,10 @@ impl<'a> Parser<'a> {
         self.stream.peek_with(LexHint::Any).expect("[Parser] Internal error: Unexpected end of token stream")
     }
 
-    fn expect(&mut self, kind: TokenKind) -> Option<Token> {
+    fn expect(&mut self, kind: TokenKind, msg: String) -> Option<Token> {
         let tok = self.peek_token();
         if tok.kind != kind {
-            self.error(tok.span, format!("Expected token of kind {:?}, got {:?} instead", kind, tok.kind));
+            self.error(tok.span, msg);
             None
         } else {
             self.stream.next()
@@ -86,6 +86,17 @@ impl<'a> Parser<'a> {
 impl<'a> Parser<'a> {
     fn error(&mut self, span: Span, msg: String) {
         self.errors.push(ParseError { span, msg });
+    }
+
+    fn recover_to_stmt_start(&mut self) {
+        let mut save = self.stream.get_position();
+        while let Some(tok) = self.stream.next() {
+            if tok.kind == TokenKind::Let || Self::get_op(tok.kind).nud.is_some() {
+                self.stream.set_position(save);
+                break;
+            }
+            save = self.stream.get_position();
+        }
     }
 }
 
@@ -109,12 +120,23 @@ impl<'a> Parser<'a> {
     fn parse_let_stmt(&mut self) -> Stmt<'a> {
         let let_kw = self.hard_expect(TokenKind::Let);
 
-        let name = match self.expect(TokenKind::Identifier) {
-            Some(ident) => ident.span.slice(self.stream.get_src()),
-            None => "",
+        let ident_token = match self.expect(TokenKind::Identifier, "Expected Identifier".to_string()) {
+            Some(ident) => ident,
+            None => {
+                self.recover_to_stmt_start();
+                return Stmt { kind: StmtKind::Error, span: let_kw.span }
+            }
         };
 
-        self.expect(TokenKind::Assign);
+        let name = ident_token.span.slice(self.stream.get_src());
+
+        match self.expect(TokenKind::Assign, "Expected '='".to_string()) {
+            None => {
+                self.recover_to_stmt_start();
+                return Stmt { kind: StmtKind::Error, span: let_kw.span.concat(&ident_token.span) }
+            }
+            _ => {},
+        }
 
         let value = self.parse_expression(0);
 
@@ -149,7 +171,7 @@ impl<'a> Parser<'a> {
 
 impl<'a> Parser<'a> {
     fn parse_expression(&mut self, rbp: u8) -> Expr<'a> {
-        self.stream.save_position();
+        let revert_point = self.stream.get_position();
         self.skip_newlines();
 
         let token = self.next_token();
@@ -159,8 +181,8 @@ impl<'a> Parser<'a> {
             let nud = match op.nud {
                 Some(nud) => nud,
                 None => {
-                    self.stream.restore_position();
-                    self.error(token.span, format!("Token of kind {:?} has no NUD parsing rule", token.kind));
+                    self.stream.set_position(revert_point);
+                    self.error(token.span, "Expected expression".to_string());
                     return Expr { kind: ExprKind::Error, span: token.span };
                 }
             };
@@ -169,23 +191,16 @@ impl<'a> Parser<'a> {
         };
 
         loop {
-            self.stream.save_position();
+            let revert_point = self.stream.get_position();
             self.skip_newlines();
 
             let next = self.next_token();
 
             let op = Self::get_op(next.kind);
 
-            if op.lbp <= rbp { self.stream.restore_position(); break; }
+            if op.lbp <= rbp { self.stream.set_position(revert_point); break; }
 
-            let led = match op.led {
-                Some(led) => led,
-                None => {
-                    self.stream.restore_position();
-                    self.error(next.span, format!("Token of kind {:?} has no LED parsing rule", next.kind));
-                    return Expr { kind: ExprKind::Error, span: next.span };
-                }
-            };
+            let led = op.led.expect("token has l_bp but no LED");
 
             lhs = led(self, lhs, next);
         }
@@ -208,8 +223,8 @@ impl<'a> Parser<'a> {
             Minus       => Operator { lbp: 2, nud: None, led: Some(Self::parse_binary_op) },
             Star        => Operator::led_op(4, Self::parse_binary_op),
             Slash       => Operator::led_op(4, Self::parse_binary_op),
-            Assign      => Operator::led_op(1, Self::parse_binary_op),
-            LParen      => Operator::nud_op(Self::parse_tuple_or_grouped),
+            Assign      => Operator::not_an_op(),
+            LParen      => Operator::nud_op(Self::parse_parathesised),
             RParen      => Operator::not_an_op(),
             Dot         => todo!("Member access"),
             Semicolon   => Operator::not_an_op(),
@@ -234,7 +249,7 @@ impl<'a> Parser<'a> {
 
     fn parse_binary_op(&mut self, lhs: Expr<'a>, tok: Token) -> Expr<'a> {
         let (op, rbp) = match tok.kind {
-            TokenKind::Assign   => (BinaryOp::Assign, 0),
+            // TokenKind::Assign   => (BinaryOp::Assign, 0),
             TokenKind::Plus     => (BinaryOp::Add, 3),
             TokenKind::Minus    => (BinaryOp::Sub, 3),
             TokenKind::Star     => (BinaryOp::Mul, 5),
@@ -248,10 +263,9 @@ impl<'a> Parser<'a> {
         Expr { kind: ExprKind::BinaryOp { op, left: Box::new(lhs), right: Box::new(rhs) }, span }
     }
 
-    fn parse_tuple_or_grouped(&mut self, tok: Token) -> Expr<'a> {
-        // TODO: tuples
+    fn parse_parathesised(&mut self, tok: Token) -> Expr<'a> {
         let expr = self.parse_expression(0);
-        let closing_tok = self.expect(TokenKind::RParen);
+        let closing_tok = self.expect(TokenKind::RParen, "Expected ')'".to_string());
 
         let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
 
