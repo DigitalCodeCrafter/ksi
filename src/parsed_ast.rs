@@ -1,8 +1,9 @@
-use crate::lexer::Span;
+use crate::Span;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Unit {
-
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ast<'a> {
+    pub stmts: Vec<Stmt<'a>>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,6 +32,11 @@ pub enum ExprKind<'a> {
     Identifier { name: &'a str },
     BinaryOp { op: BinaryOp, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
     Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unit {
+
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

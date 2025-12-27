@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::{ast_structure::{BinaryOp, Expr, ExprKind, Stmt, StmtKind}, lexer::{Span, TokenStream}, parser::Parser};
+use crate::{parsed_ast::{BinaryOp, Expr, ExprKind, Stmt, StmtKind}, lexer::TokenStream, parser::Parser, Span};
 
 pub struct Env<'a> {
     vars: HashMap<&'a str, f64>,
@@ -16,12 +16,12 @@ pub fn interpret_program<'a>(src: &'a str) -> (HashMap<&'a str, f64>, Vec<EvalEr
     let tokens = TokenStream::new(src);
     let mut parser = Parser::new(tokens);
 
-    let stmts = parser.parse_program();
+    let ast = parser.parse_program();
 
     let mut env = Env { vars: HashMap::new() };
     let mut errors = Vec::new();
 
-    for stmt in &stmts {
+    for stmt in &ast.stmts {
         match eval_stmt(stmt, &mut env) {
             Err(e) => errors.push(e),
             Ok(_) => {},

@@ -1,5 +1,6 @@
-use crate::lexer::{LexHint, Span, Token, TokenKind, TokenStream};
-use crate::ast_structure::*;
+use crate::lexer::{LexHint, Token, TokenKind, TokenStream};
+use crate::parsed_ast::*;
+use crate::Span;
 
 type NudFn<'a> = fn(&mut Parser<'a>, Token) -> Expr<'a>;
 type LedFn<'a> = fn(&mut Parser<'a>, Expr<'a>, Token) -> Expr<'a>;
@@ -42,14 +43,22 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_program(&mut self) -> Vec<Stmt<'a>> {
+    pub fn parse_program(&mut self) -> Ast<'a> {
         let mut stmts = Vec::new();
 
         while !matches!(self.stream.peek_with(LexHint::Any).map(|t| t.kind), Some(TokenKind::EOF) | None) {
             stmts.push(self.parse_statement());
         }
 
-        stmts
+        let span = stmts.first()
+            .and_then(|f| stmts.last()
+                .map(|l| f.span.concat(&l.span)))
+            .unwrap_or(Span::new(0, 0));
+
+        Ast {
+            stmts,
+            span,
+        }
     }
 }
 
@@ -128,7 +137,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let name = ident_token.span.slice(self.stream.get_src());
+        let name = &self.stream.get_src()[ident_token.span.start..ident_token.span.end];
 
         match self.expect(TokenKind::Assign, "Expected '='".to_string()) {
             None => {
@@ -236,13 +245,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var(&mut self, tok: Token) -> Expr<'a> {
-        let text = tok.span.slice(self.stream.get_src());
+        let text = &self.stream.get_src()[tok.span.start..tok.span.end];
 
         Expr { kind: ExprKind::Identifier { name: text }, span: tok.span }
     }
 
     fn parse_number(&mut self, tok: Token) -> Expr<'a> {
-        let num_str = tok.span.slice(self.stream.get_src());
+        let num_str = &self.stream.get_src()[tok.span.start..tok.span.end];
 
         Expr { kind: ExprKind::Number { value: num_str.parse().unwrap(), unit: None }, span: tok.span }
     }
@@ -324,58 +333,61 @@ let a = x + 2\r
         let tokens = TokenStream::new(src);
         let mut parser = Parser::new(tokens);
 
-        let expected = vec![
-            Stmt {
-                kind: StmtKind::Let {
-                    name: "x",
-                    value: Expr { kind: ExprKind::Number { value: 0.0, unit: None }, span: Span::new(10, 11) }
-                },
-                span: Span::new(2, 12)
-            },
-            Stmt {
-                kind: StmtKind::Expr(Expr {
-                    kind: ExprKind::BinaryOp {
-                        op: BinaryOp::Add,
-                        left: Box::new(Expr {
-                            kind: ExprKind::BinaryOp {
-                                op: BinaryOp::Add,
-                                left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) }),
-                                right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(17, 18) }),
-                            },
-                            span: Span::new(13, 18)
-                        }),
-                        right: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(22, 23) })
+        let expected = Ast {
+            stmts: vec![
+                Stmt {
+                    kind: StmtKind::Let {
+                        name: "x",
+                        value: Expr { kind: ExprKind::Number { value: 0.0, unit: None }, span: Span::new(10, 11) }
                     },
-                    span: Span::new(13, 23),
-                }),
-                span: Span::new(13, 25),
-            },
-            Stmt {
-                kind: StmtKind::Let {
-                    name: "a",
-                    value: Expr {
+                    span: Span::new(2, 12)
+                },
+                Stmt {
+                    kind: StmtKind::Expr(Expr {
                         kind: ExprKind::BinaryOp {
                             op: BinaryOp::Add,
-                            left: Box::new(Expr { kind: ExprKind::Identifier { name: "x" }, span: Span::new(33, 34) }),
-                            right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(37, 38) })
+                            left: Box::new(Expr {
+                                kind: ExprKind::BinaryOp {
+                                    op: BinaryOp::Add,
+                                    left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) }),
+                                    right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(17, 18) }),
+                                },
+                                span: Span::new(13, 18)
+                            }),
+                            right: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(22, 23) })
                         },
-                        span: Span::new(33, 38)
-                    }
+                        span: Span::new(13, 23),
+                    }),
+                    span: Span::new(13, 25),
                 },
-                span: Span::new(25, 40)
-            },
-            Stmt {
-                kind: StmtKind::Expr(Expr {
-                    kind: ExprKind::BinaryOp {
-                        op: BinaryOp::Add,
-                        left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(40, 41) }),
-                        right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(45, 46) })
+                Stmt {
+                    kind: StmtKind::Let {
+                        name: "a",
+                        value: Expr {
+                            kind: ExprKind::BinaryOp {
+                                op: BinaryOp::Add,
+                                left: Box::new(Expr { kind: ExprKind::Identifier { name: "x" }, span: Span::new(33, 34) }),
+                                right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(37, 38) })
+                            },
+                            span: Span::new(33, 38)
+                        }
                     },
-                    span: Span::new(40, 46)
-                }),
-                span: Span::new(40, 48)
-            }
-        ];
+                    span: Span::new(25, 40)
+                },
+                Stmt {
+                    kind: StmtKind::Expr(Expr {
+                        kind: ExprKind::BinaryOp {
+                            op: BinaryOp::Add,
+                            left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(40, 41) }),
+                            right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(45, 46) })
+                        },
+                        span: Span::new(40, 46)
+                    }),
+                    span: Span::new(40, 48)
+                }
+            ],
+            span: Span::new(2, 48),
+        };
 
         assert_eq!(parser.parse_program(), expected);
         assert_eq!(parser.errors.len(), 0);
