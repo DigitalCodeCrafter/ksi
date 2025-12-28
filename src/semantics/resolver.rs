@@ -1,5 +1,18 @@
 use std::collections::HashMap;
-use crate::{Span, parsed_ast as p, resolved_ast as r, typechecker::Type};
+use crate::common::Span;
+use crate::common::diagnostics::*;
+use crate::syntax as p;
+use crate::semantics::{
+    resolved_ast as r,
+    typechecker::Type,
+};
+
+pub fn resolve(parsed_ast: p::ParsedAst, diagnostics: &mut impl DiagnosticSink) -> (r::ResolvedAst, SymbolTable) {
+    let mut resolver = Resolver::new(diagnostics);
+    let resolved_ast = resolver.resolve_program(parsed_ast);
+    let symbols = resolver.symbols;
+    (resolved_ast, symbols)
+}
 
 // IDs
 
@@ -47,7 +60,7 @@ struct Scope {
     bindings: HashMap<String, SymbolId>,
 }
 
-struct  ScopeGraph {
+struct ScopeGraph {
     scopes: Vec<Scope>,
 }
 impl ScopeGraph {
@@ -92,16 +105,17 @@ pub enum ResolveError {
     UseBeforeDefinintion(String, Span, Span),
 }
 
-pub struct Resolver {
+pub struct Resolver<'d, D: DiagnosticSink> {
     scopes: ScopeGraph,
     symbols: SymbolTable,
     errors: Vec<ResolveError>,
+    diags: &'d mut D,
 
     current_scope: ScopeId,
 }
 
-impl Resolver {
-    pub fn new() -> Self {
+impl<'d, D: DiagnosticSink> Resolver<'d, D> {
+    pub fn new(diags: &'d mut D) -> Self {
         let mut scopes = ScopeGraph { scopes: Vec::new() };
         let global = scopes.new_scope(None);
 
@@ -109,11 +123,12 @@ impl Resolver {
             scopes,
             symbols: SymbolTable { symbols: Vec::new() },
             errors: Vec::new(),
+            diags,
             current_scope: global,
         }
     }
 
-    pub fn resolve_program(&mut self, ast: p::Ast) -> r::ResolvedAst {
+    pub fn resolve_program(&mut self, ast: p::ParsedAst) -> r::ResolvedAst {
         for stmt in &ast.stmts {
             self.declare_stmt(stmt);
         }
@@ -124,13 +139,9 @@ impl Resolver {
         
         r::ResolvedAst { stmts: resolved_stmts.collect(), span: ast.span }
     }
-
-    pub fn into_table(self) -> SymbolTable {
-        self.symbols
-    }
 }
 
-impl Resolver {
+impl<'d, D: DiagnosticSink> Resolver<'d, D> {
     fn declare_stmt(&mut self, stmt: &p::Stmt) {
         match stmt.kind {
             p::StmtKind::Let { name, .. } => {
@@ -224,13 +235,13 @@ impl Resolver {
 
 #[cfg(test)]
 mod tests {
-    use crate::Span;
+    use crate::common::Span;
 
     use super::*;
 
     #[test]
     fn simple_test() {
-        let src = p::Ast {
+        let src = p::ParsedAst {
             stmts: vec![
                 p::Stmt {
                     kind: p::StmtKind::Let {
@@ -284,7 +295,8 @@ mod tests {
             span: Span::new(0, 17)
         };
 
-        let mut resolver = Resolver::new();
+        let mut diags = AssertErrors;
+        let mut resolver = Resolver::new(&mut diags);
         assert_eq!(resolver.resolve_program(src), expected);
     }
 }

@@ -1,21 +1,30 @@
-use crate::lexer::{LexHint, Token, TokenKind, TokenStream};
-use crate::parsed_ast::*;
-use crate::Span;
+use crate::common::Span;
+use crate::common::diagnostics::*;
+use crate::syntax::{
+    lexer::*,
+    parsed_ast::*,
+};
 
-type NudFn<'a> = fn(&mut Parser<'a>, Token) -> Expr<'a>;
-type LedFn<'a> = fn(&mut Parser<'a>, Expr<'a>, Token) -> Expr<'a>;
-
-struct Operator<'a> {
-    lbp: u8,
-    nud: Option<NudFn<'a>>,
-    led: Option<LedFn<'a>>,
+pub fn parse<'src>(src: &'src str, diagnostics: &mut impl DiagnosticSink) -> ParsedAst<'src> {
+    let tokens = TokenStream::new(src);
+    let mut parser = Parser::new(tokens, diagnostics);
+    parser.parse_program()
 }
-impl<'a> Operator<'a> {
-    fn nud_op(nud: NudFn<'a>) -> Self {
+
+type NudFn<'a, 'd, D> = fn(&mut Parser<'a, 'd, D>, Token) -> Expr<'a>;
+type LedFn<'a, 'd, D> = fn(&mut Parser<'a, 'd, D>, Expr<'a>, Token) -> Expr<'a>;
+
+struct Operator<'a, 'd, D: DiagnosticSink> {
+    lbp: u8,
+    nud: Option<NudFn<'a, 'd, D>>,
+    led: Option<LedFn<'a, 'd, D>>,
+}
+impl<'a, 'd, D: DiagnosticSink> Operator<'a, 'd, D> {
+    fn nud_op(nud: NudFn<'a, 'd, D>) -> Self {
         Self { lbp: 0, nud: Some(nud), led: None }
     }
 
-    fn led_op(lbp: u8, led: LedFn<'a>) -> Self {
+    fn led_op(lbp: u8, led: LedFn<'a, 'd, D>) -> Self {
         Self { lbp, nud: None, led: Some(led) }
     }
 
@@ -24,26 +33,20 @@ impl<'a> Operator<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct ParseError {
-    pub span: Span,
-    pub msg: String,
-}
-
-pub struct Parser<'a> {
+pub struct Parser<'a, 'd, D: DiagnosticSink> {
     stream: TokenStream<'a>,
-    errors: Vec<ParseError>,
+    diags: &'d mut D,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(stream: TokenStream<'a>) -> Self {
+impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
+    pub fn new(stream: TokenStream<'a>, diags: &'d mut D) -> Self {
         Self {
             stream,
-            errors: Vec::new(),
+            diags,
         }
     }
 
-    pub fn parse_program(&mut self) -> Ast<'a> {
+    pub fn parse_program(&mut self) -> ParsedAst<'a> {
         let mut stmts = Vec::new();
 
         while !matches!(self.stream.peek_with(LexHint::Any).map(|t| t.kind), Some(TokenKind::EOF) | None) {
@@ -55,7 +58,7 @@ impl<'a> Parser<'a> {
                 .map(|l| f.span.concat(&l.span)))
             .unwrap_or(Span::new(0, 0));
 
-        Ast {
+        ParsedAst {
             stmts,
             span,
         }
@@ -64,7 +67,7 @@ impl<'a> Parser<'a> {
 
 // Helpers
 
-impl<'a> Parser<'a> {
+impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn next_token(&mut self) -> Token {
         self.stream.next().expect("[Parser] Internal error: Unexpected end of token stream")
     }
@@ -76,7 +79,7 @@ impl<'a> Parser<'a> {
     fn expect(&mut self, kind: TokenKind, msg: String) -> Option<Token> {
         let tok = self.peek_token();
         if tok.kind != kind {
-            self.error(tok.span, msg);
+            self.diags.emit(Diagnostic::error(msg).with_span(tok.span));
             None
         } else {
             self.stream.next()
@@ -90,28 +93,9 @@ impl<'a> Parser<'a> {
     }
 }
 
-// Errors
-
-impl<'a> Parser<'a> {
-    fn error(&mut self, span: Span, msg: String) {
-        self.errors.push(ParseError { span, msg });
-    }
-
-    fn recover_to_stmt_start(&mut self) {
-        let mut save = self.stream.get_position();
-        while let Some(tok) = self.stream.next() {
-            if tok.kind == TokenKind::Let || Self::get_op(tok.kind).nud.is_some() {
-                self.stream.set_position(save);
-                break;
-            }
-            save = self.stream.get_position();
-        }
-    }
-}
-
 // Statements
 
-impl<'a> Parser<'a> {
+impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_statement(&mut self) -> Stmt<'a> {
         self.skip_newlines();
         match self.peek_token().kind {
@@ -120,7 +104,7 @@ impl<'a> Parser<'a> {
             TokenKind::Semicolon => Stmt { kind: StmtKind::Empty, span: self.next_token().span },
             _ => {
                 let tok = self.next_token();
-                self.error(tok.span, format!("Expected Let Statement or Expression, found {:?}", tok.kind));
+                self.diags.emit(Diagnostic::error(format!("Expected Let Statement or Expression, found {:?}", tok.kind)).with_span(tok.span));
                 return Stmt { kind: StmtKind::Error, span: tok.span };
             }
         }
@@ -168,17 +152,28 @@ impl<'a> Parser<'a> {
     fn expect_terminator(&mut self) -> Option<Token> {
         let tok = self.peek_token();
         if !matches!(tok.kind, TokenKind::Newline | TokenKind::EOF | TokenKind::Semicolon ) {
-            self.error(tok.span, "Expected new line or ';' terminator".to_string());
+            self.diags.emit(Diagnostic::error("Expected new line or ';' terminator").with_span(tok.span));
             None
         } else {
             self.stream.next()
+        }
+    }
+
+    fn recover_to_stmt_start(&mut self) {
+        let mut save = self.stream.get_position();
+        while let Some(tok) = self.stream.next() {
+            if tok.kind == TokenKind::Let || Self::get_op(tok.kind).nud.is_some() {
+                self.stream.set_position(save);
+                break;
+            }
+            save = self.stream.get_position();
         }
     }
 }
 
 // Expressions
 
-impl<'a> Parser<'a> {
+impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_expression(&mut self, rbp: u8) -> Expr<'a> {
         let revert_point = self.stream.get_position();
         self.skip_newlines();
@@ -191,7 +186,7 @@ impl<'a> Parser<'a> {
                 Some(nud) => nud,
                 None => {
                     self.stream.set_position(revert_point);
-                    self.error(token.span, "Expected expression".to_string());
+                    self.diags.emit(Diagnostic::error("Expected expression").with_span(token.span));
                     return Expr { kind: ExprKind::Error, span: token.span };
                 }
             };
@@ -223,7 +218,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn get_op(kind: TokenKind) -> Operator<'a> {
+    fn get_op(kind: TokenKind) -> Operator<'a, 'd, D> {
         use TokenKind::*;
         match kind {
             Identifier  => Operator::nud_op(Self::parse_var),
@@ -282,6 +277,8 @@ impl<'a> Parser<'a> {
     }
 }
 
+// Tests
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,7 +288,8 @@ mod tests {
         let src = "2 + 2 * (4 - 2)";
 
         let tokens = TokenStream::new(src);
-        let mut parser = Parser::new(tokens);
+        let mut diags = AssertErrors;
+        let mut parser = Parser::new(tokens, &mut diags);
 
         let expected = Expr {
             kind: ExprKind::BinaryOp {
@@ -317,7 +315,6 @@ mod tests {
         };
 
         assert_eq!(parser.parse_expression(0), expected);
-        assert_eq!(parser.errors.len(), 0);
     }
 
     #[test]
@@ -331,9 +328,10 @@ let a = x + 2\r
         ";
 
         let tokens = TokenStream::new(src);
-        let mut parser = Parser::new(tokens);
+        let mut diags = AssertErrors;
+        let mut parser = Parser::new(tokens, &mut diags);
 
-        let expected = Ast {
+        let expected = ParsedAst {
             stmts: vec![
                 Stmt {
                     kind: StmtKind::Let {
@@ -390,6 +388,5 @@ let a = x + 2\r
         };
 
         assert_eq!(parser.parse_program(), expected);
-        assert_eq!(parser.errors.len(), 0);
     }
 }

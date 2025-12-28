@@ -1,8 +1,9 @@
-use crate::Span;
-pub use crate::resolved_ast::Unit;
-pub use crate::resolved_ast::BinaryOp;
-use crate::resolver::SymbolId;
-use crate::typechecker::Type;
+use crate::common::Span;
+pub use crate::semantics::resolved_ast::{Unit, BinaryOp};
+use crate::semantics::{
+    resolver::SymbolId,
+    typechecker::Type,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedAst {

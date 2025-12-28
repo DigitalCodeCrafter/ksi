@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-
-use crate::{ir::{BinaryOp, Block, FunctionIR, Instr, Place, ProgramIR, Terminator, Value}, lowerer::{LocalId, TempId}};
+use crate::ir::*;
 
 // TODO: REFACTOR THIS 100%
 

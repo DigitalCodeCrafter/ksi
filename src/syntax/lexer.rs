@@ -1,4 +1,4 @@
-use crate::Span;
+use crate::common::Span;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
@@ -39,12 +39,12 @@ pub struct Token {
 #[derive(Debug, Clone, Copy)]
 pub enum LexHint {
     Any,        // default
-    DigitsOnly, // just digits, no '.' or 'e'
+    // DigitsOnly, // just digits, no '.' or 'e'
 }
 
 // Lexing
 
-pub struct Lexer<'a> {
+struct Lexer<'a> {
     input: &'a str,
     pos: usize,
 }
@@ -195,8 +195,6 @@ impl Lexer<'_> {
 
 // Streaming
 
-// Safe wrapper for storing lexer position
-// (avoids setting the lexer into a token or into a utf8-char)
 #[derive(Debug, Clone, Copy)]
 pub struct LexerPosition(usize);
 
@@ -210,10 +208,6 @@ impl<'a> TokenStream<'a> {
         Self { lexer: Lexer::new(input), done: false }
     }
 
-    pub fn from_lexer(lexer: Lexer<'a>) -> Self {
-        Self { lexer, done: false }
-    }
-
     pub fn get_src(&self) -> &'a str {
         self.lexer.input
     }
@@ -225,6 +219,10 @@ impl<'a> TokenStream<'a> {
     pub fn set_position(&mut self, pos: LexerPosition) {
         self.lexer.pos = pos.0;
         self.done = false;
+    }
+
+    pub fn next(&mut self) -> Option<Token> {
+        self.next_with(LexHint::Any)
     }
 
     pub fn next_with(&mut self, hint: LexHint) -> Option<Token> {
@@ -244,14 +242,6 @@ impl<'a> TokenStream<'a> {
         self.lexer.pos = save;
 
         Some(tok)
-    }
-}
-
-impl<'a> Iterator for TokenStream<'a> {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next_with(LexHint::Any)
     }
 }
 

@@ -1,7 +1,6 @@
-use crate::Span;
-pub use crate::parsed_ast::Unit;
-pub use crate::parsed_ast::BinaryOp;
-use crate::resolver::SymbolId;
+use crate::common::Span;
+pub use crate::syntax::{Unit, BinaryOp};
+use crate::semantics::resolver::SymbolId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResolvedAst {

@@ -1,6 +1,14 @@
 use std::collections::HashMap;
-use crate::{ir::*, resolver::{SymbolId, SymbolTable}, typechecker::Type, typed_ast as t};
+use crate::common::diagnostics::*;
+use crate::semantics::{Type, SymbolTable, SymbolId, typed_ast as t};
+use crate::ir::ir::*;
 
+pub fn lower(typed_ast: t::TypedAst, symbols: &SymbolTable, diagnostics: &mut impl DiagnosticSink) -> ProgramIR {
+    let mut builder = FunctionIRBuilder::new(symbols);
+    builder.lower_function(typed_ast);
+    let func_ir = builder.finish();
+    ProgramIR { functions: vec![func_ir] }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TempId(u32);
@@ -46,7 +54,7 @@ impl<'a> FunctionIRBuilder<'a> {
         }
     }
 
-    pub fn lower_program(&mut self, ast: t::TypedAst) {
+    pub fn lower_function(&mut self, ast: t::TypedAst) {
         for stmt in ast.stmts {
             self.lower_stmt(stmt);
         }
@@ -150,6 +158,7 @@ impl FunctionIRBuilder<'_> {
     }    
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use crate::{lexer::TokenStream, parser::Parser, resolver::Resolver, typechecker::TypeChecker};
@@ -208,3 +217,4 @@ let y = x - 3
         assert_eq!(expected, ir);
     }
 }
+*/

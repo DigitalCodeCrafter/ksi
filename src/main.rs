@@ -1,23 +1,16 @@
-use ksi::{codegen::KosEmitter, lexer::TokenStream, lowerer::FunctionIRBuilder, parser::Parser, resolver::Resolver, typechecker::TypeChecker};
+use ksi::{codegen::generate, common::diagnostics::Diagnostics, ir::lower, semantics::analyze, syntax::parse};
 
 fn main() {
     let file_path = std::env::args().nth(1).expect("Missing file path");
 
     let content = std::fs::read_to_string(file_path).unwrap();
 
-    let tokens = TokenStream::new(&content);
-    let ast = Parser::new(tokens).parse_program();
+    let mut diagnostics = Diagnostics::empty();
+    let parsed_ast = parse(&content, &mut diagnostics);
+    let (typed_ast, symbols) = analyze(parsed_ast, &mut diagnostics);
+    let ir = lower(typed_ast, &symbols, &mut diagnostics);
+    let out = generate(&ir, &mut diagnostics);
 
-    let mut resolver = Resolver::new();
-
-    let resolved_ast = resolver.resolve_program(ast);
-    let mut symbols = resolver.into_table();
-
-    let typed_ast = TypeChecker::new(&mut symbols).type_check(resolved_ast);
-
-    let mut builder = FunctionIRBuilder::new(&symbols);
-    builder.lower_program(typed_ast);
-    let ir = ksi::ir::ProgramIR { functions: vec![builder.finish()] };
-
-    println!("{}", KosEmitter::emit_program(&ir))
+    println!("{}", out)
 }
+

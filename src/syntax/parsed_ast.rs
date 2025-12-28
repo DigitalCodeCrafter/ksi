@@ -1,7 +1,7 @@
-use crate::Span;
+use crate::common::Span;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Ast<'a> {
+pub struct ParsedAst<'a> {
     pub stmts: Vec<Stmt<'a>>,
     pub span: Span,
 }

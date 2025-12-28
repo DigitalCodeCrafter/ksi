@@ -1,6 +1,15 @@
-use crate::{Span, resolved_ast as r};
-use crate::resolver::SymbolTable;
-use crate::typed_ast as t;
+use crate::common::Span;
+use crate::common::diagnostics::*;
+use crate::semantics::{
+    resolver::SymbolTable,
+    resolved_ast as r,
+    typed_ast as t,
+};
+
+pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, diagnostics: &mut impl DiagnosticSink) -> t::TypedAst {
+    let mut tc = TypeChecker::new(symbols);
+    tc.type_check(resolved_ast)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
