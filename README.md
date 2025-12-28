@@ -2,7 +2,8 @@
 
 **THIS SOFTWARE IS CURRENTLY IN DEVELOPMENT AND NOT IN A USABLE STATE**
 
-KSI is a programming language intendet to be a replacement for **kOS** - a scripting mod for KSP.
+KSI is a programming language intendet to be a replacement of Kerboscript from **kOS** - a scripting mod for KSP.
+It is compiled to the `.ksm` bytecode format, which kOS uses too, and can be executed like any other script in kOS.
 
 ## Features
 
