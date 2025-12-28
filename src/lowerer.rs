@@ -9,6 +9,16 @@ pub struct LocalId(u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BlockId(u32);
 
+impl TempId {
+    pub fn index(&self) -> u32 { self.0 }
+}
+impl LocalId {
+    pub fn index(&self) -> u32 { self.0 }
+}
+impl BlockId {
+    pub fn index(&self) -> u32 { self.0 }
+}
+
 pub struct FunctionIRBuilder<'a> {
     locals: Vec<Local>,
     temps: Vec<Temp>,
@@ -138,82 +148,6 @@ impl FunctionIRBuilder<'_> {
         let block = &mut self.blocks[self.current_block.0 as usize];
         block.instrs.push(instr);
     }    
-}
-
-pub mod pretty_ir {
-    use crate::{ir::{BinaryOp, Block, FunctionIR, Instr, Place, Terminator, Value}, lowerer::BlockId};
-
-    pub fn format_value(v: &Value) -> String {
-        match v {
-            Value::Temp(t) => format!("t{}", t.0),
-            Value::ConstNumber(n) => format!("const {}", n),
-        }
-    }
-
-    pub fn format_place(p: &Place) -> String {
-        match p {
-            Place::Local(l) => format!("l{}", l.0),
-        }
-    }
-
-    pub fn format_instr(instr: &Instr) -> String {
-        match instr {
-            Instr::LoadConst { dst, value } => {
-                format!("t{} = const {}", dst.0, value)
-            }
-            Instr::Binary { dst, op, lhs, rhs } => {
-                let op_str = match op {
-                    BinaryOp::Add => "+",
-                    BinaryOp::Sub => "-",
-                    BinaryOp::Mul => "*",
-                    BinaryOp::Div => "/",
-                };
-                format!("t{} = {} {} {}", dst.0, format_value(lhs), op_str, format_value(rhs))
-            }
-            Instr::Store { place, value } => {
-                format!("store {}, {}", format_place(place), format_value(value))
-            }
-            Instr::Load { dst, place } => {
-                format!("t{} = load {}", dst.0, format_place(place))
-            }
-            Instr::Poision { dst } => {
-                if let Some(dst) = dst {
-                    format!("poison t{}", dst.0)
-                } else {
-                    "posion".to_string()
-                }
-            }
-        }
-    }
-
-    pub fn format_terminator(term: &Terminator) -> String {
-        match term {
-            Terminator::Goto(b) => format!("goto block{}", b.0),
-            Terminator::Return(v) => format!("return {}", format_value(v)),
-            Terminator::Unreachable => "unreachable".to_string(),
-        }
-    }
-
-    pub fn format_block(id: BlockId, block: &Block) -> String {
-        let mut s = format!("block{}:\n", id.0);
-        for instr in &block.instrs {
-            s.push_str(&format!("  {}\n", format_instr(instr)));
-        }
-        s.push_str(&format!("  {}\n", format_terminator(&block.terminator)));
-        s
-    }
-
-    pub fn format_function(name: &str, func: &FunctionIR) -> String {
-        let mut s = format!("Function {}:\n", name);
-        s.push_str("locals:\n");
-        for (i, local) in func.locals.iter().enumerate() {
-            s.push_str(&format!("  l{}: {:?}\n", i, local.ty));
-        }
-        for (i, block) in func.blocks.iter().enumerate() {
-            s.push_str(&format_block(BlockId(i as u32), block));
-        }
-        s
-    }
 }
 
 #[cfg(test)]

@@ -1,3 +1,5 @@
+
+
 pub mod lexer;
 pub mod parsed_ast;
 pub mod parser;
@@ -8,6 +10,7 @@ pub mod typed_ast;
 pub mod typechecker;
 pub mod ir;
 pub mod lowerer;
+pub mod codegen;
 
 /// Span of a Token / AST Node in bytes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
