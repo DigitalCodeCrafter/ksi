@@ -124,6 +124,10 @@ impl Resolver {
         
         r::ResolvedAst { stmts: resolved_stmts.collect(), span: ast.span }
     }
+
+    pub fn into_table(self) -> SymbolTable {
+        self.symbols
+    }
 }
 
 impl Resolver {

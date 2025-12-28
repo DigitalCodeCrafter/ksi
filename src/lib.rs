@@ -6,6 +6,8 @@ pub mod resolved_ast;
 pub mod resolver;
 pub mod typed_ast;
 pub mod typechecker;
+pub mod ir;
+pub mod lowerer;
 
 /// Span of a Token / AST Node in bytes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
