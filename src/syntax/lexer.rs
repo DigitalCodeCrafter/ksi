@@ -201,18 +201,20 @@ pub struct LexerPosition(usize);
 pub struct TokenStream<'a> {
     lexer: Lexer<'a>,
     done: bool,
+
+    peek_info: Option<(LexHint, Token)>,
 }
 
 impl<'a> TokenStream<'a> {
     pub fn new(input: &'a str) -> Self {
-        Self { lexer: Lexer::new(input), done: false }
+        Self { lexer: Lexer::new(input), done: false, peek_info: None }
     }
 
     pub fn get_src(&self) -> &'a str {
         self.lexer.input
     }
 
-    pub fn get_position(&mut self) -> LexerPosition {
+    pub fn get_position(&self) -> LexerPosition {
         LexerPosition(self.lexer.pos)
     }
 
@@ -239,6 +241,7 @@ impl<'a> TokenStream<'a> {
         
         let tok = self.lexer.next_token(hint);
 
+        self.peek_info = Some((hint, tok));
         self.lexer.pos = save;
 
         Some(tok)

@@ -77,10 +77,10 @@ impl ScopeGraph {
         self.scopes[scope.0 as usize].parent
     }
 
-    fn insert(&mut self, scope: ScopeId, name: String, symbol: SymbolId) -> Result<(), ()> {
+    fn insert(&mut self, scope: ScopeId, name: String, symbol: SymbolId) -> Result<(), SymbolId> {
         let scope = &mut self.scopes[scope.0 as usize];
-        if scope.bindings.contains_key(&name) {
-            return Err(());
+        if let Some(id) = scope.bindings.get(&name) {
+            return Err(*id);
         }
         scope.bindings.insert(name, symbol);
         Ok(())
@@ -99,16 +99,9 @@ impl ScopeGraph {
 
 // Resolution
 
-pub enum ResolveError {
-    Redeclaration(String, Span),
-    Unresolved(String, Span),
-    UseBeforeDefinintion(String, Span, Span),
-}
-
 pub struct Resolver<'d, D: DiagnosticSink> {
     scopes: ScopeGraph,
     symbols: SymbolTable,
-    errors: Vec<ResolveError>,
     diags: &'d mut D,
 
     current_scope: ScopeId,
@@ -122,7 +115,6 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
         Self {
             scopes,
             symbols: SymbolTable { symbols: Vec::new() },
-            errors: Vec::new(),
             diags,
             current_scope: global,
         }
@@ -152,13 +144,24 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                     ty: None,
                 });
 
-                if self.scopes.insert(self.current_scope, name.to_string(), symbol).is_err() {
-                    self.errors.push(ResolveError::Redeclaration(name.to_string(), stmt.span));
+                if let Err(id) = self.scopes.insert(self.current_scope, name.to_string(), symbol) {
+                    self.redeclaration(name, stmt.span, self.symbols.get(id).def_span);
                 }
             }
 
             _ => {}
         }
+    }
+
+    fn redeclaration(&mut self, name: &str, new: Span, old: Span) {
+        self.diags.emit(
+            Diagnostic::error(format!("redeclaration of '{name}'"))
+            .with_span(new)
+            .with_label(Label::secondary(
+                old,
+                "previous declaration here",
+            ))
+        );
     }
 
     fn resolve_stmt(&mut self, stmt: p::Stmt) -> r::Stmt {
@@ -213,7 +216,15 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                             Some(p) => p,
                             None => {
                                 let sym_span = self.symbols.get(first.unwrap()).def_span;
-                                self.errors.push(ResolveError::UseBeforeDefinintion(name.to_string(), span, sym_span));
+                                self.diags.emit(
+                                    Diagnostic::error("use of variable before its definition")
+                                    .with_span(span)
+                                    .with_label(Label::primary(span))
+                                    .with_label(Label::secondary(
+                                        sym_span,
+                                        "variable defined here",
+                                    ))
+                                );
                                 return None;
                             }
                         };
@@ -223,7 +234,11 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                     return Some(sym);
                 }
                 None => {
-                    self.errors.push(ResolveError::Unresolved(name.to_string(), span));
+                    self.diags.emit(
+                        Diagnostic::error("use of undeclared variable")
+                        .with_span(span)
+                        .with_label(Label::primary(span))
+                    );
                     return None;
                 }
             }
@@ -295,7 +310,7 @@ mod tests {
             span: Span::new(0, 17)
         };
 
-        let mut diags = AssertErrors;
+        let mut diags = sinks::AssertErrors;
         let mut resolver = Resolver::new(&mut diags);
         assert_eq!(resolver.resolve_program(src), expected);
     }

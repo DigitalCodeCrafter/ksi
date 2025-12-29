@@ -62,34 +62,37 @@ pub trait DiagnosticSink {
     fn emit(&mut self, diagnostic: Diagnostic);
 }
 
-pub struct Diagnostics {
-    pub diagnostics: Vec<Diagnostic>,
-}
-impl DiagnosticSink for Diagnostics {
-    fn emit(&mut self, diagnostic: Diagnostic) {
-        self.diagnostics.push(diagnostic);
+pub mod sinks {
+    use super::{Diagnostic, DiagnosticSink, Severity};
+    pub struct Diagnostics {
+        pub diagnostics: Vec<Diagnostic>,
     }
-}
-impl Diagnostics {
-    pub fn empty() -> Self {
-        Self { diagnostics: Vec::new() }
+    impl DiagnosticSink for Diagnostics {
+        fn emit(&mut self, diagnostic: Diagnostic) {
+            self.diagnostics.push(diagnostic);
+        }
     }
-    
-    pub fn has_error(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == Severity::Error)
+    impl Diagnostics {
+        pub fn empty() -> Self {
+            Self { diagnostics: Vec::new() }
+        }
+        
+        pub fn has_error(&self) -> bool {
+            self.diagnostics.iter().any(|d| d.severity == Severity::Error)
+        }
     }
-}
 
-pub struct IgnoreErrors;
-impl DiagnosticSink for IgnoreErrors {
-    fn emit(&mut self, _: Diagnostic) {}
-}
+    pub struct IgnoreErrors;
+    impl DiagnosticSink for IgnoreErrors {
+        fn emit(&mut self, _: Diagnostic) {}
+    }
 
-pub struct AssertErrors;
-impl DiagnosticSink for AssertErrors {
-    fn emit(&mut self, diagnostic: Diagnostic) {
-        if diagnostic.severity == Severity::Error {
-            panic!("[AssertErrors] Error: {:?}", diagnostic)
+    pub struct AssertErrors;
+    impl DiagnosticSink for AssertErrors {
+        fn emit(&mut self, diagnostic: Diagnostic) {
+            if diagnostic.severity == Severity::Error {
+                panic!("[AssertErrors] Error: {:?}", diagnostic)
+            }
         }
     }
 }

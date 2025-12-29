@@ -31,7 +31,6 @@ impl<'e> KosEmitter<'e> {
         self.out.push_str(&format!("l{}", id.index()))
     }
 
-
     fn emit_value(&mut self, v: &Value) {
         match v {
             Value::ConstNumber(n) => self.out.push_str(&n.to_string()),
@@ -95,7 +94,7 @@ impl<'e> KosEmitter<'e> {
     fn emit_terminator(&mut self, term: &Terminator) {
         self.emit_indent();
         match term {
-            Terminator::Goto(_) => todo!("SOme good way to handle this too."),
+            Terminator::Goto(_) => todo!("Some good way to handle this too."),
             Terminator::Return(v) => {
                 self.emit("return ");
                 self.emit_value(v);

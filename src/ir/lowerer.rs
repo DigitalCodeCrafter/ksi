@@ -3,7 +3,7 @@ use crate::common::diagnostics::*;
 use crate::semantics::{Type, SymbolTable, SymbolId, typed_ast as t};
 use crate::ir::ir::*;
 
-pub fn lower(typed_ast: t::TypedAst, symbols: &SymbolTable, diagnostics: &mut impl DiagnosticSink) -> ProgramIR {
+pub fn lower(typed_ast: t::TypedAst, symbols: &SymbolTable, _diagnostics: &mut impl DiagnosticSink) -> ProgramIR {
     let mut builder = FunctionIRBuilder::new(symbols);
     builder.lower_function(typed_ast);
     let func_ir = builder.finish();

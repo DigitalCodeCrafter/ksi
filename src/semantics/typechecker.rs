@@ -6,7 +6,7 @@ use crate::semantics::{
     typed_ast as t,
 };
 
-pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, diagnostics: &mut impl DiagnosticSink) -> t::TypedAst {
+pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, _diagnostics: &mut impl DiagnosticSink) -> t::TypedAst {
     let mut tc = TypeChecker::new(symbols);
     tc.type_check(resolved_ast)
 }

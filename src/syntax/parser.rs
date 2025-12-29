@@ -76,16 +76,6 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         self.stream.peek_with(LexHint::Any).expect("[Parser] Internal error: Unexpected end of token stream")
     }
 
-    fn expect(&mut self, kind: TokenKind, msg: String) -> Option<Token> {
-        let tok = self.peek_token();
-        if tok.kind != kind {
-            self.diags.emit(Diagnostic::error(msg).with_span(tok.span));
-            None
-        } else {
-            self.stream.next()
-        }
-    }
-
     fn hard_expect(&mut self, kind: TokenKind) -> Token {
         let tok = self.next_token();
         assert_eq!(tok.kind, kind, "[Parser] Internal error: Expected token of kind {:?}, got {:?} instead", kind, tok.kind);
@@ -104,7 +94,11 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
             TokenKind::Semicolon => Stmt { kind: StmtKind::Empty, span: self.next_token().span },
             _ => {
                 let tok = self.next_token();
-                self.diags.emit(Diagnostic::error(format!("Expected Let Statement or Expression, found {:?}", tok.kind)).with_span(tok.span));
+                self.diags.emit(
+                    Diagnostic::error("invalid start of statement")
+                    .with_span(tok.span)
+                    .note("expected 'let' or an expression")
+                );
                 return Stmt { kind: StmtKind::Error, span: tok.span };
             }
         }
@@ -113,9 +107,15 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_let_stmt(&mut self) -> Stmt<'a> {
         let let_kw = self.hard_expect(TokenKind::Let);
 
-        let ident_token = match self.expect(TokenKind::Identifier, "Expected Identifier".to_string()) {
-            Some(ident) => ident,
-            None => {
+        let ident_token = match self.next_token() {
+            ident @ Token { kind: TokenKind::Identifier, .. }=> ident,
+            other => {
+                self.diags.emit(
+                    Diagnostic::error("expected an identifier after 'let'")
+                    .with_span(other.span)
+                    .with_label(Label::secondary(let_kw.span, "'let' starts a variable declaration"))
+                );
+
                 self.recover_to_stmt_start();
                 return Stmt { kind: StmtKind::Error, span: let_kw.span }
             }
@@ -123,12 +123,18 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
         let name = &self.stream.get_src()[ident_token.span.start..ident_token.span.end];
 
-        match self.expect(TokenKind::Assign, "Expected '='".to_string()) {
-            None => {
+        match self.next_token() {
+            Token { kind: TokenKind::Assign, .. } => {}
+            other => {
+                self.diags.emit(
+                    Diagnostic::error("expected '=' after variable name")
+                    .with_span(other.span)
+                    .note("a 'let' statement must assign an initial value")
+                    .with_label(Label::secondary(ident_token.span, "variable declared here"))
+                );
                 self.recover_to_stmt_start();
                 return Stmt { kind: StmtKind::Error, span: let_kw.span.concat(&ident_token.span) }
             }
-            _ => {},
         }
 
         let value = self.parse_expression(0);
@@ -152,7 +158,11 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn expect_terminator(&mut self) -> Option<Token> {
         let tok = self.peek_token();
         if !matches!(tok.kind, TokenKind::Newline | TokenKind::EOF | TokenKind::Semicolon ) {
-            self.diags.emit(Diagnostic::error("Expected new line or ';' terminator").with_span(tok.span));
+            self.diags.emit(
+                Diagnostic::error("missign statement terminator")
+                .with_span(tok.span)
+                .note("statements must end with ';' or a new line")
+            );
             None
         } else {
             self.stream.next()
@@ -186,7 +196,11 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
                 Some(nud) => nud,
                 None => {
                     self.stream.set_position(revert_point);
-                    self.diags.emit(Diagnostic::error("Expected expression").with_span(token.span));
+                    self.diags.emit(
+                        Diagnostic::error("Expected expression")
+                        .with_span(token.span)
+                        .note("expected a literal, identifier, or '('")
+                    );
                     return Expr { kind: ExprKind::Error, span: token.span };
                 }
             };
@@ -269,7 +283,18 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
     fn parse_parathesised(&mut self, tok: Token) -> Expr<'a> {
         let expr = self.parse_expression(0);
-        let closing_tok = self.expect(TokenKind::RParen, "Expected ')'".to_string());
+
+        let closing_tok = match self.next_token() {
+            token @ Token { kind: TokenKind::RParen, .. } => Some(token),
+            other => {
+                self.diags.emit(
+                    Diagnostic::error("missing closing ')'")
+                    .with_span(other.span)
+                    .with_label(Label::secondary(tok.span, "this '(' is not closed"))
+                );
+                None
+            }
+        };
 
         let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
 
@@ -288,7 +313,7 @@ mod tests {
         let src = "2 + 2 * (4 - 2)";
 
         let tokens = TokenStream::new(src);
-        let mut diags = AssertErrors;
+        let mut diags = sinks::AssertErrors;
         let mut parser = Parser::new(tokens, &mut diags);
 
         let expected = Expr {
@@ -328,7 +353,7 @@ let a = x + 2\r
         ";
 
         let tokens = TokenStream::new(src);
-        let mut diags = AssertErrors;
+        let mut diags = sinks::AssertErrors;
         let mut parser = Parser::new(tokens, &mut diags);
 
         let expected = ParsedAst {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use crate::common::Span;
-use crate::common::diagnostics::Diagnostics;
+use crate::common::diagnostics::sinks::Diagnostics;
 use crate::syntax::*;
 
 pub struct Env<'a> {
