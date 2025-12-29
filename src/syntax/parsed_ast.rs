@@ -31,6 +31,7 @@ pub enum ExprKind<'a> {
     Number { value: f64, unit: Option<Unit> },
     Identifier { name: &'a str },
     BinaryOp { op: BinaryOp, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
+    Block { stmts: Vec<Stmt<'a>> },
     Error,
 }
 

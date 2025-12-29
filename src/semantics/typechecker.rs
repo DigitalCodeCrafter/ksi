@@ -14,6 +14,7 @@ pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, _diagnosti
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Number,
+    Unit,
     Never,
     Error,
 }
@@ -96,6 +97,24 @@ impl TypeChecker<'_> {
                     kind: t::ExprKind::BinaryOp { op, left, right },
                     span: expr.span,
                     ty: Type::Number,
+                }
+            }
+
+            r::ExprKind::Block { stmts } => {
+                let typed_stmts: Vec<t::Stmt> = stmts
+                    .into_iter()
+                    .map(|stmt| self.check_stmt(stmt))
+                    .collect();
+                
+                let ty = match typed_stmts.first() {
+                    Some(t::Stmt { kind: t::StmtKind::Expr(e), .. }) => e.ty.clone(),
+                    _ => Type::Unit,
+                };
+
+                t::Expr {
+                    kind: t::ExprKind::Block { stmts: typed_stmts },
+                    span: expr.span,
+                    ty,
                 }
             }
 

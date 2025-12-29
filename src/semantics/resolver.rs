@@ -135,7 +135,7 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
 
 impl<'d, D: DiagnosticSink> Resolver<'d, D> {
     fn declare_stmt(&mut self, stmt: &p::Stmt) {
-        match stmt.kind {
+        match &stmt.kind {
             p::StmtKind::Let { name, .. } => {
                 let symbol = self.symbols.insert(Symbol {
                     kind: SymbolKind::Local,
@@ -148,10 +148,32 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                     self.redeclaration(name, stmt.span, self.symbols.get(id).def_span);
                 }
             }
+            // p::StmtKind::Expr(expr) => self.declare_expr(expr),
 
             _ => {}
         }
     }
+
+    /* fn declare_expr(&mut self, expr: &p::Expr) {
+        match &expr.kind {
+            p::ExprKind::BinaryOp { left, right, .. } => {
+                self.declare_expr(left);
+                self.declare_expr(right);
+            }
+            p::ExprKind::Block { stmts } => {
+                let outer = self.current_scope;
+                self.current_scope = self.scopes.new_scope(Some(outer));
+
+                for stmt in stmts {
+                    self.declare_stmt(stmt);
+                }
+
+                self.current_scope = outer;
+            }
+
+            _ => {},
+        }
+    } */
 
     fn redeclaration(&mut self, name: &str, new: Span, old: Span) {
         self.diags.emit(
@@ -163,7 +185,9 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
             ))
         );
     }
+}
 
+impl<'d, D: DiagnosticSink> Resolver<'d, D> {
     fn resolve_stmt(&mut self, stmt: p::Stmt) -> r::Stmt {
         let kind = match stmt.kind {
             p::StmtKind::Let { name, value } => {
@@ -192,7 +216,23 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                 let left = Box::new(self.resolve_expr(*left));
                 let right = Box::new(self.resolve_expr(*right));
                 r::ExprKind::BinaryOp { op, left, right }
-            },
+            }
+            p::ExprKind::Block { stmts } => {
+                let outer = self.current_scope;
+                self.current_scope = self.scopes.new_scope(Some(outer));
+
+                for stmt in &stmts {
+                    self.declare_stmt(stmt);
+                }
+
+                let resolved_stmts = stmts
+                    .into_iter()
+                    .map(|stmt| self.resolve_stmt(stmt))
+                    .collect();
+            
+                self.current_scope = outer;
+                r::ExprKind::Block { stmts: resolved_stmts }
+            }
             p::ExprKind::Error => r::ExprKind::Error,
         };
 

@@ -12,14 +12,14 @@ pub enum TokenKind {
     Star,
     Slash,
     Assign,
-
-    // groups
-    LParen,
-    RParen,
-
-    // Delimiters
     Dot,
     Semicolon,
+
+    // Delimiters
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
 
     // Keywords
     Let,
@@ -50,7 +50,7 @@ struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+    fn new(input: &'a str) -> Self {
         Lexer {
             input,
             pos: 0,
@@ -93,10 +93,12 @@ impl Lexer<'_> {
             '*' => return self.single(TokenKind::Star),
             '/' => return self.single(TokenKind::Slash),
             '=' => return self.single(TokenKind::Assign),
-            '(' => return self.single(TokenKind::LParen),
-            ')' => return self.single(TokenKind::RParen),
             '.' => return self.single(TokenKind::Dot),
             ';' => return self.single(TokenKind::Semicolon),
+            '(' => return self.single(TokenKind::LParen),
+            ')' => return self.single(TokenKind::RParen),
+            '{' => return self.single(TokenKind::LBrace),
+            '}' => return self.single(TokenKind::RBrace),
             '\n' => return self.single(TokenKind::Newline),
 
             _ => {}

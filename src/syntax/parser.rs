@@ -241,11 +241,13 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
             Minus       => Operator { lbp: 2, nud: None, led: Some(Self::parse_binary_op) },
             Star        => Operator::led_op(4, Self::parse_binary_op),
             Slash       => Operator::led_op(4, Self::parse_binary_op),
-            Assign      => Operator::not_an_op(),
+            Assign      => Operator::not_an_op(), // TODO
+            Dot         => Operator::not_an_op(), // TODO
+            Semicolon   => Operator::not_an_op(),
             LParen      => Operator::nud_op(Self::parse_parathesised),
             RParen      => Operator::not_an_op(),
-            Dot         => todo!("Member access"),
-            Semicolon   => Operator::not_an_op(),
+            LBrace      => Operator::nud_op(Self::parse_block),
+            RBrace      => Operator::not_an_op(),
             Let         => Operator::not_an_op(),
             Newline     => Operator::not_an_op(),
             Unknown     => Operator::not_an_op(),
@@ -284,8 +286,11 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_parathesised(&mut self, tok: Token) -> Expr<'a> {
         let expr = self.parse_expression(0);
 
-        let closing_tok = match self.next_token() {
-            token @ Token { kind: TokenKind::RParen, .. } => Some(token),
+        let closing_tok = match self.peek_token() {
+            token @ Token { kind: TokenKind::RParen, .. } => {
+                self.stream.next();
+                Some(token)
+            }
             other => {
                 self.diags.emit(
                     Diagnostic::error("missing closing ')'")
@@ -299,6 +304,36 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
 
         Expr { span, ..expr }
+    }
+
+    fn parse_block(&mut self, tok: Token) -> Expr<'a> {
+        let mut stmts = Vec::new();
+
+        while !matches!(self.peek_token().kind, TokenKind::RBrace | TokenKind::EOF) {
+            stmts.push(self.parse_statement());
+        }
+
+        let closing_tok = match self.peek_token() {
+            token @ Token { kind: TokenKind::RBrace, .. } => {
+                self.stream.next();
+                Some(token)
+            }
+            other => {
+                self.diags.emit(
+                    Diagnostic::error("missing closing '}'")
+                    .with_span(other.span)
+                    .with_label(Label::secondary(tok.span, "this '(' is not closed"))
+                );
+                None
+            }
+        };
+
+        let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
+
+        Expr {
+            kind: ExprKind::Block { stmts },
+            span,
+        }
     }
 }
 

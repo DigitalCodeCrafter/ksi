@@ -16,7 +16,7 @@ Expression = PrattExpr;
 nud = Number
     | Identifier
     | "(", Expression, ")"
-    | "-", Expression
+    | "{", { Statement }, "}" (* TODO *)
     ;
 
 led = "+", Expression
