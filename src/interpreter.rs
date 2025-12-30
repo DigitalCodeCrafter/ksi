@@ -4,6 +4,7 @@ use crate::common::diagnostics::sinks::Diagnostics;
 use crate::syntax::*;
 
 pub struct Env<'a> {
+    parent: Option<&'a Env<'a>>
     vars: HashMap<&'a str, f64>,
 }
 
@@ -18,7 +19,7 @@ pub fn interpret_program<'a>(src: &'a str) -> (HashMap<&'a str, f64>, Vec<EvalEr
     let mut diagnostics = Diagnostics::empty();
     let ast = parse(src, &mut diagnostics);
 
-    let mut env = Env { vars: HashMap::new() };
+    let mut env = Env { parent: None, vars: HashMap::new() };
     let mut errors = Vec::new();
 
     for stmt in &ast.stmts {
@@ -51,10 +52,21 @@ fn eval_expr<'a>(expr: &Expr<'a>, env: &Env<'a>) -> Result<f64, EvalError> {
     match &expr.kind {
         ExprKind::Number { value, .. } => Ok(*value),
 
-        ExprKind::Identifier { name } => env.vars
-            .get(name)
-            .copied()
-            .ok_or(EvalError::UnknownVariable(name.to_string(), expr.span)),
+        ExprKind::Identifier { name } => {
+            let mut current = env;
+            loop {
+                let found = current.vars.get(name).copied();
+
+                if let Some(val) = found {
+                    return Ok(val)
+                }
+
+                match current.parent {
+                    Some(p) => current = p,
+                    None => return Err(EvalError::UnknownVariable(name.to_string(), expr.span)),
+                }
+            }
+        }
 
         ExprKind::BinaryOp { op, left, right } => {
             let l = eval_expr(left, env)?;
@@ -66,6 +78,16 @@ fn eval_expr<'a>(expr: &Expr<'a>, env: &Env<'a>) -> Result<f64, EvalError> {
                 BinaryOp::Mul => Ok(l * r),
                 BinaryOp::Div => Ok(l / r),
             }
+        }
+
+        ExprKind::Block { stmts, tail_expr } => {
+            let mut inner_env = Env { parent: Some(env), vars: HashMap::new() };
+
+            for stmt in stmts {
+                eval_stmt(&mut inner_env, stmt)?;
+            }
+
+            tail_expr.map(|expr| eval_expr(&inner_env, expr)).unwrap_or(Ok(0.0))
         }
 
         ExprKind::Error => Err(EvalError::InvalidExpression(expr.span)),

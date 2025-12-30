@@ -344,8 +344,9 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
         let tail_expr = match stmts.pop() {
             Some(Stmt { kind: StmtKind::Expr(expr), span }) if expr.span != span => Some(Box::new(expr)),
-            other => { stmts.push(other); None }
-        }
+            Some(other) => { stmts.push(other); None }
+            _ => None,
+        };
 
         Expr {
             kind: ExprKind::Block { stmts, tail_expr },

@@ -230,7 +230,7 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                     .map(|stmt| self.resolve_stmt(stmt))
                     .collect();
                 
-                let resolved_expr = tail_expr.map(|expr| self.resolve_expr(expr));
+                let resolved_expr = tail_expr.map(|expr| Box::new(self.resolve_expr(*expr)));
             
                 self.current_scope = outer;
                 r::ExprKind::Block { stmts: resolved_stmts, tail_expr: resolved_expr }
