@@ -15,7 +15,7 @@ pub struct Stmt<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind<'a> {
     Let { name: &'a str, value: Expr<'a> },
-    Expr { expr: Expr<'a>, terminated: bool },
+    Expr(Expr<'a>),
     Empty,
     Error,
 }
@@ -31,7 +31,7 @@ pub enum ExprKind<'a> {
     Number { value: f64, unit: Option<Unit> },
     Identifier { name: &'a str },
     BinaryOp { op: BinaryOp, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
-    Block { stmts: Vec<Stmt<'a>> },
+    Block { stmts: Vec<Stmt<'a>>, tail_expr: Option<Box<Expr<'a>>> },
     Error,
 }
 

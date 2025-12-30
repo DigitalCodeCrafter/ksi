@@ -17,7 +17,7 @@ pub struct Stmt {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind {
     Let { sym: SymbolId, value: Expr },
-    Expr { expr: Expr, terminated: bool },
+    Expr(Expr),
     Empty,
     Error,
 }
@@ -33,6 +33,6 @@ pub enum ExprKind {
     Number { value: f64, unit: Option<Unit> },
     Identifier { sym: SymbolId },
     BinaryOp { op: BinaryOp, left: Box<Expr>, right: Box<Expr> },
-    Block { stmts: Vec<Stmt> },
+    Block { stmts: Vec<Stmt>, tail_expr: Option<Box<Expr>> },
     Error,
 }

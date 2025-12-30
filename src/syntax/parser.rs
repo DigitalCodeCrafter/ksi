@@ -148,25 +148,18 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
     fn parse_expr_stmt(&mut self) -> Stmt<'a> {
         let expr = self.parse_expression(0);
-        let terminator = match self.expect_terminator();
+        let terminator = self.expect_terminator();
 
         let span = terminator.map(|t| t.span.concat(&expr.span)).unwrap_or(expr.span);
 
-        Stmt { kind: StmtKind::Expr { expr, terminated: terminator.is_some() }, span }
+        Stmt { kind: StmtKind::Expr(expr), span }
     }
 
     fn expect_terminator(&mut self) -> Option<Token> {
-        let save = self.stream.get_position();
-        self.skip_newlines();
         match self.peek_token() {
-            Token { kind: TokenKind::Semicolon, .. } => self.stream.next(),
-            Token { kind: TokeKind::RBrace | TokenKind::EOF, .. } => None,
+            Token { kind: TokenKind::Semicolon | TokenKind::Newline, .. } => self.stream.next(),
+            Token { kind: TokenKind::RBrace | TokenKind::EOF, .. } => None,
             other => {
-                // skipped at least one newline
-                if save != self.stream.get_position() {
-                    self.stream.set_position(save);
-                    return self.stream.next();
-                }
                 self.diags.emit(
                     Diagnostic::error("missing statement terminator")
                     .with_span(other.span)
@@ -326,8 +319,10 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_block(&mut self, tok: Token) -> Expr<'a> {
         let mut stmts = Vec::new();
 
+        self.skip_newlines();
         while !matches!(self.peek_token().kind, TokenKind::RBrace | TokenKind::EOF) {
             stmts.push(self.parse_statement());
+            self.skip_newlines();
         }
 
         let closing_tok = match self.peek_token() {
@@ -347,8 +342,13 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
         let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
 
+        let tail_expr = match stmts.pop() {
+            Some(Stmt { kind: StmtKind::Expr(expr), span }) if expr.span != span => Some(Box::new(expr)),
+            other => { stmts.push(other); None }
+        }
+
         Expr {
-            kind: ExprKind::Block { stmts },
+            kind: ExprKind::Block { stmts, tail_expr },
             span,
         }
     }

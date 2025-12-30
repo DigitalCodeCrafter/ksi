@@ -58,10 +58,7 @@ impl TypeChecker<'_> {
                 self.symbols.get_mut(sym).ty = Some(value.ty.clone());
                 t::StmtKind::Let { sym, value }
             }
-            r::StmtKind::Expr { expr, terminated } => t::StmtKind::Expr {
-                expr: self.infer(expr),
-                terminated
-            },
+            r::StmtKind::Expr(expr) => t::StmtKind::Expr(self.infer(expr)),
             r::StmtKind::Empty => t::StmtKind::Empty,
             r::StmtKind::Error => t::StmtKind::Error,
         };
@@ -103,22 +100,21 @@ impl TypeChecker<'_> {
                 }
             }
 
-            r::ExprKind::Block { stmts } => {
+            r::ExprKind::Block { stmts, tail_expr } => {
                 let typed_stmts: Vec<t::Stmt> = stmts
                     .into_iter()
                     .map(|stmt| self.check_stmt(stmt))
                     .collect();
                 
-                let ty = match typed_stmts.first() {
-                    Some(t::Stmt {
-                        kind: t::StmtKind::Expr { expr, terminated: false }, 
-                        .. 
-                    }) => expr.ty.clone(),
-                    _ => Type::Unit,
-                };
+                let typed_expr = tail_expr.map(|expr| self.infer(expr));
+
+                let ty = typed_expr.map(|e| e.ty.clone()).unwrap_or(Type::Unit);
 
                 t::Expr {
-                    kind: t::ExprKind::Block { stmts: typed_stmts },
+                    kind: t::ExprKind::Block {
+                        stmts: typed_stmts,
+                        tail_expr: typed_expr,
+                    },
                     span: expr.span,
                     ty,
                 }
