@@ -467,10 +467,10 @@ let a = x + 2\r
                         },
                         span: Span::new(40, 46)
                     }),
-                    span: Span::new(40, 48)
+                    span: Span::new(40, 46)
                 }
             ],
-            span: Span::new(2, 48),
+            span: Span::new(2, 46),
         };
 
         assert_eq!(parser.parse_program(), expected);
