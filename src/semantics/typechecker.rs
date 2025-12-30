@@ -106,7 +106,7 @@ impl TypeChecker<'_> {
                     .map(|stmt| self.check_stmt(stmt))
                     .collect();
                 
-                let typed_expr = tail_expr.map(|expr| self.infer(expr));
+                let typed_expr = tail_expr.map(|expr| Box::new(self.infer(*expr)));
 
                 let ty = typed_expr.map(|e| e.ty.clone()).unwrap_or(Type::Unit);
 

@@ -128,6 +128,19 @@ impl FunctionIRBuilder<'_> {
                 });
                 dst
             }
+            t::ExprKind::Block { stmts, tail_expr } => {
+                for stmt in stmts {
+                    self.lower_stmt();
+                }
+
+                match tail_expr {
+                    Some(expr) => self.lower_expr(*expr),
+                    None => {
+                        let dst = self.new_temp(Type::Unit);
+                        todo!("Load unit into temporary")
+                    }
+                }
+            }
             t::ExprKind::Error => {
                 let dst = self.new_temp(expr.ty);
                 self.emit(Instr::Poision { dst: Some(dst) });

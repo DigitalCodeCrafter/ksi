@@ -4,7 +4,7 @@ use crate::common::diagnostics::sinks::Diagnostics;
 use crate::syntax::*;
 
 pub struct Env<'a> {
-    parent: Option<&'a Env<'a>>
+    parent: Option<&'a Env<'a>>,
     vars: HashMap<&'a str, f64>,
 }
 
@@ -84,10 +84,10 @@ fn eval_expr<'a>(expr: &Expr<'a>, env: &Env<'a>) -> Result<f64, EvalError> {
             let mut inner_env = Env { parent: Some(env), vars: HashMap::new() };
 
             for stmt in stmts {
-                eval_stmt(&mut inner_env, stmt)?;
+                eval_stmt(stmt, &mut inner_env)?;
             }
 
-            tail_expr.map(|expr| eval_expr(&inner_env, expr)).unwrap_or(Ok(0.0))
+            tail_expr.map(|expr| eval_expr(expr, &inner_env)).unwrap_or(Ok(0.0))
         }
 
         ExprKind::Error => Err(EvalError::InvalidExpression(expr.span)),

@@ -156,10 +156,18 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     }
 
     fn expect_terminator(&mut self) -> Option<Token> {
+        let save = self.stream.get_position();
+        self.skip_newlines();
         match self.peek_token() {
-            Token { kind: TokenKind::Semicolon | TokenKind::Newline, .. } => self.stream.next(),
+            Token { kind: TokenKind::Semicolon, .. } => self.stream.next(),
             Token { kind: TokenKind::RBrace | TokenKind::EOF, .. } => None,
             other => {
+                // skipped at least one newline
+                if save != self.stream.get_position() {
+                    self.stream.set_position(save);
+                    return self.stream.next();
+                }
+                
                 self.diags.emit(
                     Diagnostic::error("missing statement terminator")
                     .with_span(other.span)
@@ -343,7 +351,7 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
 
         let tail_expr = match stmts.pop() {
-            Some(Stmt { kind: StmtKind::Expr(expr), span }) if expr.span != span => Some(Box::new(expr)),
+            Some(Stmt { kind: StmtKind::Expr(expr), span }) if expr.span == span => Some(Box::new(expr)),
             Some(other) => { stmts.push(other); None }
             _ => None,
         };
