@@ -130,7 +130,7 @@ impl FunctionIRBuilder<'_> {
             }
             t::ExprKind::Block { stmts, tail_expr } => {
                 for stmt in stmts {
-                    self.lower_stmt();
+                    self.lower_stmt(stmt);
                 }
 
                 match tail_expr {

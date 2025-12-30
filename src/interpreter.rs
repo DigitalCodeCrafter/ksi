@@ -87,7 +87,7 @@ fn eval_expr<'a>(expr: &Expr<'a>, env: &Env<'a>) -> Result<f64, EvalError> {
                 eval_stmt(stmt, &mut inner_env)?;
             }
 
-            tail_expr.map(|expr| eval_expr(expr, &inner_env)).unwrap_or(Ok(0.0))
+            tail_expr.as_ref().map(|expr| eval_expr(expr, &inner_env)).unwrap_or(Ok(0.0))
         }
 
         ExprKind::Error => Err(EvalError::InvalidExpression(expr.span)),

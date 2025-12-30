@@ -108,7 +108,7 @@ impl TypeChecker<'_> {
                 
                 let typed_expr = tail_expr.map(|expr| Box::new(self.infer(*expr)));
 
-                let ty = typed_expr.map(|e| e.ty.clone()).unwrap_or(Type::Unit);
+                let ty = typed_expr.as_ref().map(|e| e.ty.clone()).unwrap_or(Type::Unit);
 
                 t::Expr {
                     kind: t::ExprKind::Block {
