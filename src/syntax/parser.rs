@@ -167,7 +167,7 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
                     self.stream.set_position(save);
                     return self.stream.next();
                 }
-                
+
                 self.diags.emit(
                     Diagnostic::error("missing statement terminator")
                     .with_span(other.span)
@@ -427,24 +427,21 @@ let a = x + 2\r
                     span: Span::new(2, 12)
                 },
                 Stmt {
-                    kind: StmtKind::Expr {
-                        expr: Expr {
-                            kind: ExprKind::BinaryOp {
-                                op: BinaryOp::Add,
-                                left: Box::new(Expr {
-                                    kind: ExprKind::BinaryOp {
-                                        op: BinaryOp::Add,
-                                        left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) }),
-                                        right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(17, 18) }),
-                                    },
-                                    span: Span::new(13, 18)
-                                }),
-                                right: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(22, 23) })
-                            },
-                            span: Span::new(13, 23),
+                    kind: StmtKind::Expr(Expr {
+                        kind: ExprKind::BinaryOp {
+                            op: BinaryOp::Add,
+                            left: Box::new(Expr {
+                                kind: ExprKind::BinaryOp {
+                                    op: BinaryOp::Add,
+                                    left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) }),
+                                    right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(17, 18) }),
+                                },
+                                span: Span::new(13, 18)
+                            }),
+                            right: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(22, 23) })
                         },
-                        terminated: true
-                    },
+                        span: Span::new(13, 23),
+                    }),
                     span: Span::new(13, 25),
                 },
                 Stmt {
@@ -462,17 +459,14 @@ let a = x + 2\r
                     span: Span::new(25, 40)
                 },
                 Stmt {
-                    kind: StmtKind::Expr {
-                        expr: Expr {
-                            kind: ExprKind::BinaryOp {
-                                op: BinaryOp::Add,
-                                left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(40, 41) }),
-                                right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(45, 46) })
-                            },
-                            span: Span::new(40, 46)
+                    kind: StmtKind::Expr(Expr {
+                        kind: ExprKind::BinaryOp {
+                            op: BinaryOp::Add,
+                            left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(40, 41) }),
+                            right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(45, 46) })
                         },
-                        terminated: false,
-                    },
+                        span: Span::new(40, 46)
+                    }),
                     span: Span::new(40, 48)
                 }
             ],
