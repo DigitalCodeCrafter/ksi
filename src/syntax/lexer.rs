@@ -197,7 +197,7 @@ impl Lexer<'_> {
 
 // Streaming
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LexerPosition(usize);
 
 pub struct TokenStream<'a> {

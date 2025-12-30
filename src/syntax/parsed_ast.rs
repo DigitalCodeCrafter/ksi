@@ -15,7 +15,7 @@ pub struct Stmt<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind<'a> {
     Let { name: &'a str, value: Expr<'a> },
-    Expr(Expr<'a>),
+    Expr { expr: Expr<'a>, terminated: bool },
     Empty,
     Error,
 }

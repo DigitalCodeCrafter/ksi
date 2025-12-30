@@ -195,7 +195,10 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                 let sym = self.scopes.lookup(self.current_scope, name).unwrap();
                 r::StmtKind::Let { sym, value }
             }
-            p::StmtKind::Expr(expr) => r::StmtKind::Expr(self.resolve_expr(expr)),
+            p::StmtKind::Expr { expr, terminated } => r::StmtKind::Expr {
+                expr: self.resolve_expr(expr),
+                terminated
+            },
             p::StmtKind::Empty => r::StmtKind::Empty,
             p::StmtKind::Error => r::StmtKind::Error,
         };
@@ -309,14 +312,14 @@ mod tests {
                     span: Span { start: 0, end: 10 }
                 },
                 p::Stmt {
-                    kind: p::StmtKind::Expr(p::Expr {
+                    kind: p::StmtKind::Expr { expr: p::Expr {
                         kind: p::ExprKind::BinaryOp {
                             op: p::BinaryOp::Add,
                             left: Box::new(p::Expr { kind: p::ExprKind::Identifier { name: "x" }, span: Span::new(11, 12) }),
                             right: Box::new(p::Expr { kind: p::ExprKind::Identifier { name: "x" }, span: Span::new(15, 16) }),
                         },
                         span: Span::new(11, 16)
-                    }),
+                    }, terminated: true },
                     span: Span::new(11, 17)
                 }
             ],
@@ -336,14 +339,14 @@ mod tests {
                     span: Span { start: 0, end: 10 }
                 },
                 r::Stmt {
-                    kind: r::StmtKind::Expr(r::Expr {
+                    kind: r::StmtKind::Expr { expr: r::Expr {
                         kind: r::ExprKind::BinaryOp {
                             op: r::BinaryOp::Add,
                             left: Box::new(r::Expr { kind: r::ExprKind::Identifier { sym: SymbolId(0) }, span: Span::new(11, 12) }),
                             right: Box::new(r::Expr { kind: r::ExprKind::Identifier { sym: SymbolId(0) }, span: Span::new(15, 16) }),
                         },
                         span: Span::new(11, 16)
-                    }),
+                    }, terminated: true },
                     span: Span::new(11, 17)
                 }
             ],

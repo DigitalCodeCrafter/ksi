@@ -2,10 +2,12 @@
 Program     = { Statement };
 
 (* Statements *)
-Statement   = LetStmt | ExprStmt;
+Statement   = { NewLine },
+              LetStmt | ExprStmt | EmptyStmt;
 
 LetStmt     = "let", Identifier, "=", Expression, Terminator;
 ExprStmt    = Expression, Terminator;
+EmptyStmt   = ";";
 
 Terminator  = ";" | Newline;
 

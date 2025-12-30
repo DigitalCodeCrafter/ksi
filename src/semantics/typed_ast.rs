@@ -20,7 +20,7 @@ pub struct Stmt {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind {
     Let { sym: SymbolId, value: Expr },
-    Expr(Expr),
+    Expr { expr: Expr, terminated: bool },
     Empty,
     Error,
 }

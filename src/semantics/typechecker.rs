@@ -58,7 +58,10 @@ impl TypeChecker<'_> {
                 self.symbols.get_mut(sym).ty = Some(value.ty.clone());
                 t::StmtKind::Let { sym, value }
             }
-            r::StmtKind::Expr(expr) => t::StmtKind::Expr(self.infer(expr)),
+            r::StmtKind::Expr { expr, terminated } => t::StmtKind::Expr {
+                expr: self.infer(expr),
+                terminated
+            },
             r::StmtKind::Empty => t::StmtKind::Empty,
             r::StmtKind::Error => t::StmtKind::Error,
         };
@@ -107,7 +110,10 @@ impl TypeChecker<'_> {
                     .collect();
                 
                 let ty = match typed_stmts.first() {
-                    Some(t::Stmt { kind: t::StmtKind::Expr(e), .. }) => e.ty.clone(),
+                    Some(t::Stmt {
+                        kind: t::StmtKind::Expr { expr, terminated: false }, 
+                        .. 
+                    }) => expr.ty.clone(),
                     _ => Type::Unit,
                 };
 

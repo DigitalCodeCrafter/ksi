@@ -148,35 +148,52 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
     fn parse_expr_stmt(&mut self) -> Stmt<'a> {
         let expr = self.parse_expression(0);
-        let terminator = self.expect_terminator();
+        let terminator = match self.expect_terminator();
 
         let span = terminator.map(|t| t.span.concat(&expr.span)).unwrap_or(expr.span);
 
-        Stmt { kind: StmtKind::Expr(expr), span }
+        Stmt { kind: StmtKind::Expr { expr, terminated: terminator.is_some() }, span }
     }
 
     fn expect_terminator(&mut self) -> Option<Token> {
-        let tok = self.peek_token();
-        if !matches!(tok.kind, TokenKind::Newline | TokenKind::EOF | TokenKind::Semicolon ) {
-            self.diags.emit(
-                Diagnostic::error("missign statement terminator")
-                .with_span(tok.span)
-                .note("statements must end with ';' or a new line")
-            );
-            None
-        } else {
-            self.stream.next()
+        let save = self.stream.get_position();
+        self.skip_newlines();
+        match self.peek_token() {
+            Token { kind: TokenKind::Semicolon, .. } => self.stream.next(),
+            Token { kind: TokeKind::RBrace | TokenKind::EOF, .. } => None,
+            other => {
+                // skipped at least one newline
+                if save != self.stream.get_position() {
+                    self.stream.set_position(save);
+                    return self.stream.next();
+                }
+                self.diags.emit(
+                    Diagnostic::error("missing statement terminator")
+                    .with_span(other.span)
+                    .note("statements must end with ';' or a new line")
+                );
+                None
+            }
         }
     }
 
+    // FIXME: This might recover beyond a scope termination.
     fn recover_to_stmt_start(&mut self) {
         let mut save = self.stream.get_position();
         while let Some(tok) = self.stream.next() {
-            if tok.kind == TokenKind::Let || Self::get_op(tok.kind).nud.is_some() {
-                self.stream.set_position(save);
-                break;
+            match tok.kind {
+                TokenKind::Let |
+                TokenKind::RBrace |
+                TokenKind::EOF => {
+                    self.stream.set_position(save);
+                    break;
+                }
+                k if Self::get_op(k).nud.is_some() => {
+                    self.stream.set_position(save);
+                    break;
+                }
+                _ => save = self.stream.get_position(),
             }
-            save = self.stream.get_position();
         }
     }
 }
@@ -401,21 +418,24 @@ let a = x + 2\r
                     span: Span::new(2, 12)
                 },
                 Stmt {
-                    kind: StmtKind::Expr(Expr {
-                        kind: ExprKind::BinaryOp {
-                            op: BinaryOp::Add,
-                            left: Box::new(Expr {
-                                kind: ExprKind::BinaryOp {
-                                    op: BinaryOp::Add,
-                                    left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) }),
-                                    right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(17, 18) }),
-                                },
-                                span: Span::new(13, 18)
-                            }),
-                            right: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(22, 23) })
+                    kind: StmtKind::Expr {
+                        expr: Expr {
+                            kind: ExprKind::BinaryOp {
+                                op: BinaryOp::Add,
+                                left: Box::new(Expr {
+                                    kind: ExprKind::BinaryOp {
+                                        op: BinaryOp::Add,
+                                        left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) }),
+                                        right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(17, 18) }),
+                                    },
+                                    span: Span::new(13, 18)
+                                }),
+                                right: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(22, 23) })
+                            },
+                            span: Span::new(13, 23),
                         },
-                        span: Span::new(13, 23),
-                    }),
+                        terminated: true
+                    },
                     span: Span::new(13, 25),
                 },
                 Stmt {
@@ -433,14 +453,17 @@ let a = x + 2\r
                     span: Span::new(25, 40)
                 },
                 Stmt {
-                    kind: StmtKind::Expr(Expr {
-                        kind: ExprKind::BinaryOp {
-                            op: BinaryOp::Add,
-                            left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(40, 41) }),
-                            right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(45, 46) })
+                    kind: StmtKind::Expr {
+                        expr: Expr {
+                            kind: ExprKind::BinaryOp {
+                                op: BinaryOp::Add,
+                                left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(40, 41) }),
+                                right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(45, 46) })
+                            },
+                            span: Span::new(40, 46)
                         },
-                        span: Span::new(40, 46)
-                    }),
+                        terminated: false,
+                    },
                     span: Span::new(40, 48)
                 }
             ],
