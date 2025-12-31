@@ -61,7 +61,7 @@ impl<'a> FunctionIRBuilder<'a> {
     }
 
     pub fn finish(mut self) -> FunctionIR {
-        self.blocks[self.current_block.0 as usize].terminator = Terminator::Return(Value::ConstNumber(0.0));
+        self.blocks[self.current_block.0 as usize].terminator = Terminator::Return(Value::Const(Const::Unit));
         FunctionIR {
             blocks: self.blocks,
             locals: self.locals,

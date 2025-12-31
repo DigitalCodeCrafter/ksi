@@ -33,7 +33,7 @@ impl<'e> KosEmitter<'e> {
 
     fn emit_const(&mut self, c: &Const) {
         match c {
-            Conts::Number(n) => self.out.push_str(&n.to_string()),
+            Const::Number(n) => self.out.push_str(&n.to_string()),
             Const::Unit => self.out.push_str("0"),
         }
     }

@@ -10,7 +10,7 @@ pub fn format_const(c: &Const) -> String {
 pub fn format_value(v: &Value) -> String {
     match v {
         Value::Const(c) => format!("const {}", format_const(c)),
-        Value::Temp(id) => format!("t{}", t.index()),
+        Value::Temp(id) => format!("t{}", id.index()),
     }
 }
 
@@ -32,7 +32,7 @@ pub fn format_instr(i: &Instr) -> String {
                 BinaryOp::Mul => "*",
                 BinaryOp::Div => "/",
             };
-            format!(f, "t{} = {} {} {}", dst.index(),
+            format!("t{} = {} {} {}", dst.index(),
                 format_value(lhs),
                 op_str,
                 format_value(rhs)
@@ -68,7 +68,7 @@ pub fn format_block(b: &Block, id: usize) -> String {
     for instr in &b.instrs {
         s.push_str(&format!("  {}\n", format_instr(instr)));
     }
-    s.push_str(format!("  {}\n", format_terminator(&b.terminator)));
+    s.push_str(&format!("  {}\n", format_terminator(&b.terminator)));
     s
 }
 
