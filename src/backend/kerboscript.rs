@@ -31,9 +31,16 @@ impl<'e> KosEmitter<'e> {
         self.out.push_str(&format!("l{}", id.index()))
     }
 
+    fn emit_const(&mut self, c: &Const) {
+        match c {
+            Conts::Number(n) => self.out.push_str(&n.to_string()),
+            Const::Unit => self.out.push_str("0"),
+        }
+    }
+
     fn emit_value(&mut self, v: &Value) {
         match v {
-            Value::ConstNumber(n) => self.out.push_str(&n.to_string()),
+            Value::Const(c) => self.emit_const(c),
             Value::Temp(id) => {
                 let instr = *self.temp_exprs.get(id).unwrap();
                 self.emit_instr(instr);
@@ -51,8 +58,8 @@ impl<'e> KosEmitter<'e> {
         match instr {
             Instr::LoadConst { dst, value } => {
                 if self.temp_exprs.insert(*dst, instr).is_some() {
-                    self.emit(&value.to_string());
-                    self.temp_exprs.remove(dst);
+                    self.emit_const(value);
+                    // self.temp_exprs.remove(dst);
                 }
             }
             Instr::Binary { dst, op, lhs, rhs } => {
@@ -68,7 +75,7 @@ impl<'e> KosEmitter<'e> {
                     self.emit(op_str);
                     self.emit(" ");
                     self.emit_value(rhs);
-                    self.temp_exprs.remove(dst);
+                    // self.temp_exprs.remove(dst);
                 }
             }
             Instr::Store { place, value } => {
@@ -82,7 +89,7 @@ impl<'e> KosEmitter<'e> {
             Instr::Load { dst, place} => {
                 if self.temp_exprs.insert(*dst, instr).is_some() {
                     self.emit_place(place);
-                    self.temp_exprs.remove(dst);
+                    // self.temp_exprs.remove(dst);
                 }
             }
             Instr::Poision { .. } => {

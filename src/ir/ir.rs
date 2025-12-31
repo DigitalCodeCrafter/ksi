@@ -40,7 +40,7 @@ pub enum Terminator {
 
 #[derive(Debug, PartialEq)]
 pub enum Instr {
-    LoadConst { dst: TempId, value: f64 },
+    LoadConst { dst: TempId, value: Const },
     Binary { dst: TempId, op: BinaryOp, lhs: Value, rhs: Value },
     Store { place: Place, value: Value },
     Load { dst: TempId, place: Place },
@@ -49,11 +49,17 @@ pub enum Instr {
 
 #[derive(Debug, PartialEq)]
 pub enum Value {
-    ConstNumber(f64),
+    Const(Const),
     Temp(TempId),
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Place {
     Local(LocalId)
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Const {
+    Number(f64),
+    Unit,
 }

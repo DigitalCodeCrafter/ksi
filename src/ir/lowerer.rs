@@ -97,7 +97,7 @@ impl FunctionIRBuilder<'_> {
                 let dst = self.new_temp(expr.ty);
                 self.emit(Instr::LoadConst {
                     dst,
-                    value
+                    value: Const::Number(value)
                 });
                 dst
             }
@@ -137,7 +137,11 @@ impl FunctionIRBuilder<'_> {
                     Some(expr) => self.lower_expr(*expr),
                     None => {
                         let dst = self.new_temp(Type::Unit);
-                        todo!("Load unit into temporary")
+                        self.emit(Instr::LoadConst {
+                            dst,
+                            value: Const::Unit,
+                        });
+                        dst
                     }
                 }
             }

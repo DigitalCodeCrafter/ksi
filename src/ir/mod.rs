@@ -1,6 +1,6 @@
 mod ir;
 mod lowerer;
-mod pretty;
+pub mod pretty;
 
 pub use ir::*;
 pub use lowerer::{BlockId, TempId, LocalId};
