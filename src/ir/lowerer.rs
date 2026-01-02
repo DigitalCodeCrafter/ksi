@@ -27,7 +27,7 @@ impl BlockId {
     pub fn index(&self) -> u32 { self.0 }
 }
 
-pub struct FunctionIRBuilder<'a> {
+struct FunctionIRBuilder<'a> {
     locals: Vec<Local>,
     temps: Vec<Temp>,
     blocks: Vec<Block>,
@@ -38,7 +38,7 @@ pub struct FunctionIRBuilder<'a> {
     env: HashMap<SymbolId, LocalId>,
 }
 impl<'a> FunctionIRBuilder<'a> {
-    pub fn new(symbols: &'a SymbolTable) -> Self {
+    fn new(symbols: &'a SymbolTable) -> Self {
         Self {
             locals: Vec::new(),
             temps: Vec::new(),
@@ -54,13 +54,13 @@ impl<'a> FunctionIRBuilder<'a> {
         }
     }
 
-    pub fn lower_function(&mut self, ast: t::TypedAst) {
+    fn lower_function(&mut self, ast: t::TypedAst) {
         for stmt in ast.stmts {
             self.lower_stmt(stmt);
         }
     }
 
-    pub fn finish(mut self) -> FunctionIR {
+    fn finish(mut self) -> FunctionIR {
         self.blocks[self.current_block.0 as usize].terminator = Terminator::Return(Value::Const(Const::Unit));
         FunctionIR {
             blocks: self.blocks,

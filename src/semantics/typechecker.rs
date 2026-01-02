@@ -24,20 +24,20 @@ pub enum TypeError {
     UntypedSymbol(Span),
 }
 
-pub struct TypeChecker<'a> {
+struct TypeChecker<'a> {
     symbols: &'a mut SymbolTable,
     errors: Vec<TypeError>
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(symbols: &'a mut SymbolTable) -> Self {
+    fn new(symbols: &'a mut SymbolTable) -> Self {
         Self {
             symbols,
             errors: Vec::new(),
         }
     }
 
-    pub fn type_check(&mut self, ast: r::ResolvedAst) -> t::TypedAst {
+    fn type_check(&mut self, ast: r::ResolvedAst) -> t::TypedAst {
         let typed_stmts = ast.stmts
             .into_iter()
             .map(|stmt| self.check_stmt(stmt));

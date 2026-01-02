@@ -99,7 +99,7 @@ impl ScopeGraph {
 
 // Resolution
 
-pub struct Resolver<'d, D: DiagnosticSink> {
+struct Resolver<'d, D: DiagnosticSink> {
     scopes: ScopeGraph,
     symbols: SymbolTable,
     diags: &'d mut D,
@@ -108,7 +108,7 @@ pub struct Resolver<'d, D: DiagnosticSink> {
 }
 
 impl<'d, D: DiagnosticSink> Resolver<'d, D> {
-    pub fn new(diags: &'d mut D) -> Self {
+    fn new(diags: &'d mut D) -> Self {
         let mut scopes = ScopeGraph { scopes: Vec::new() };
         let global = scopes.new_scope(None);
 
@@ -120,7 +120,7 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
         }
     }
 
-    pub fn resolve_program(&mut self, ast: p::ParsedAst) -> r::ResolvedAst {
+    fn resolve_program(&mut self, ast: p::ParsedAst) -> r::ResolvedAst {
         for stmt in &ast.stmts {
             self.declare_stmt(stmt);
         }

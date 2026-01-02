@@ -33,20 +33,20 @@ impl<'a, 'd, D: DiagnosticSink> Operator<'a, 'd, D> {
     }
 }
 
-pub struct Parser<'a, 'd, D: DiagnosticSink> {
+struct Parser<'a, 'd, D: DiagnosticSink> {
     stream: TokenStream<'a>,
     diags: &'d mut D,
 }
 
 impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
-    pub fn new(stream: TokenStream<'a>, diags: &'d mut D) -> Self {
+    fn new(stream: TokenStream<'a>, diags: &'d mut D) -> Self {
         Self {
             stream,
             diags,
         }
     }
 
-    pub fn parse_program(&mut self) -> ParsedAst<'a> {
+    fn parse_program(&mut self) -> ParsedAst<'a> {
         let mut stmts = Vec::new();
 
         while !matches!(self.stream.peek_with(LexHint::Any).map(|t| t.kind), Some(TokenKind::EOF) | None) {

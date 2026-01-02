@@ -1,5 +1,6 @@
 mod ir;
 mod lowerer;
+mod verifier;
 pub mod pretty;
 
 pub use ir::*;
