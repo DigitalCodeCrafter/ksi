@@ -35,7 +35,7 @@ impl FunctionIRVerifier<'_> {
             Instr::LoadConst { dst, .. } => {
                 self.verify_temp_def(*dst)
             }
-            Instr::Binary { dst, lhs, rhs, .. } {
+            Instr::Binary { dst, lhs, rhs, .. } => {
                 self.verify_temp(*lhs);
                 self.verify_temp(*rhs);
                 self.verify_temp_def(*dst);
@@ -47,12 +47,12 @@ impl FunctionIRVerifier<'_> {
                 }
 
                 match place {
-                    Place::Local(id) => self.ir.locals.len() > id.index(),
+                    Place::Local(id) => self.ir.locals.len() > id.index() as usize,
                 };
             }
             Instr::Load { dst, place } => {
                 match place {
-                    Place::Local(id) => self.ir.locals.len() > id.index(),
+                    Place::Local(id) => self.ir.locals.len() > id.index() as usize,
                 };
                 self.verify_temp_def(dst)
             }
@@ -66,8 +66,8 @@ impl FunctionIRVerifier<'_> {
 
     fn verify_terminator(&self, term: &Terminator) {
         match term {
-            Goto(id) => { self.ir.blocks.len() > id.len(); },
-            Return(Value::Temp(id)) => self.verify_temp(*id),
+            Terminator::Goto(id) => { self.ir.blocks.len() > id.index() as usize; },
+            Terminator::Return(Value::Temp(id)) => self.verify_temp(*id),
             _ => {}
         }
     }
