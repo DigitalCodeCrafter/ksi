@@ -26,7 +26,7 @@ impl FunctionIRVerifier<'_> {
     }
 
     fn verify_temp_def(&mut self, id: TempId) {
-        self.ir.temps.len() > id.index();
+        self.ir.temps.len() > id.index() as usize;
         self.defined.insert(id);
     }
 
@@ -36,13 +36,13 @@ impl FunctionIRVerifier<'_> {
                 self.verify_temp_def(*dst)
             }
             Instr::Binary { dst, lhs, rhs, .. } => {
-                self.verify_temp(*lhs);
-                self.verify_temp(*rhs);
+                if let Value::Temp(id) = lhs { self.verify_temp(*id) }
+                if let Value::Temp(id) = rhs { self.verify_temp(*id) };
                 self.verify_temp_def(*dst);
             }
             Instr::Store { place, value } => {
                 match value {
-                    Value::Temp(*id) => self.verify_temp(*id),
+                    Value::Temp(id) => self.verify_temp(*id),
                     _ => {}
                 }
 
@@ -54,7 +54,7 @@ impl FunctionIRVerifier<'_> {
                 match place {
                     Place::Local(id) => self.ir.locals.len() > id.index() as usize,
                 };
-                self.verify_temp_def(dst)
+                self.verify_temp_def(*dst)
             }
             Instr::Poision { dst } => {
                 if let Some(id) = dst {
