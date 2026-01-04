@@ -1,4 +1,4 @@
-use ksi::{backend, common::diagnostics::sinks::Diagnostics, mir, semantics, syntax};
+use ksi::{backend, common::diagnostics::sinks::Diagnostics, mir::{self, pretty}, semantics, syntax};
 
 
 fn main() -> Result<(), ()> {
@@ -24,7 +24,12 @@ fn main() -> Result<(), ()> {
         eprintln!("{:#?}", diagnostics.diagnostics);
     }
 
-    println!("{}", out);
+    let pretty_ir = pretty::format_body(&prog_ir, "main");
+    for line in pretty_ir.lines() {
+        println!("// {}", line);
+    }
+
+    println!("\n\n{}", out);
     Ok(()) 
 }
 

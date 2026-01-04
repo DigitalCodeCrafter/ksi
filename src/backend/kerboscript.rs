@@ -71,6 +71,7 @@ impl KosEmitter {
                 self.emit_rval(rval);
                 self.emit(".\n");
             }
+            Instr::Debug(_) => {},
         }
     }
 

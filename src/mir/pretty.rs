@@ -41,9 +41,19 @@ pub fn format_rval(rv: &RValue) -> String {
     }
 }
 
+pub fn format_debug_info(info: &DebugInfo) -> String {
+    let note = match &info.kind {
+        DebugKind::EnterExpr => "enter expression".to_string(),
+        DebugKind::ExitExpr => "exit expression".to_string(),
+        DebugKind::DeclareLocal { local, name } => format!("{} := l{}", name, local.index()),
+    };
+    format!("[{}..{}] debug: {}", info.span.start, info.span.end, note)
+}
+
 pub fn format_instr(i: &Instr) -> String {
     match i {
         Instr::Assign(place, rvalue) => format!("{} = {}", format_place(place), format_rval(rvalue)),
+        Instr::Debug(info) => format_debug_info(info),
     }
 }
 

@@ -25,6 +25,7 @@ struct ScopeId(u32);
 // Symbols
 
 pub struct Symbol {
+    pub name: String,
     kind: SymbolKind,
     scope: ScopeId,
     def_span: Span,
@@ -138,6 +139,7 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
         match &stmt.kind {
             p::StmtKind::Let { name, .. } => {
                 let symbol = self.symbols.insert(Symbol {
+                    name: name.to_string(),
                     kind: SymbolKind::Local,
                     scope: self.current_scope,
                     def_span: stmt.span,

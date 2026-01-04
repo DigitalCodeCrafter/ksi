@@ -1,4 +1,4 @@
-use crate::{mir::{BlockId, LocalId}, semantics::Type};
+use crate::{common::Span, mir::{BlockId, LocalId}, semantics::Type};
 pub use crate::semantics::typed_ast::BinaryOp;
 
 #[derive(Debug, PartialEq)]
@@ -28,6 +28,7 @@ pub enum Terminator {
 #[derive(Debug, PartialEq)]
 pub enum Instr {
     Assign(Place, RValue),
+    Debug(DebugInfo),
 }
 
 #[derive(Debug, PartialEq)]
@@ -61,3 +62,18 @@ pub enum Const {
     Unit,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct DebugInfo {
+    pub span: Span,
+    pub kind: DebugKind,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum DebugKind {
+    EnterExpr,
+    ExitExpr,
+    DeclareLocal {
+        local: LocalId,
+        name: String,
+    }
+}

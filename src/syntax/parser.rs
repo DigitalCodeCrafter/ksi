@@ -141,7 +141,7 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
         let terminator = self.expect_terminator();
 
-        let span = terminator.map(|t| t.span.concat(&let_kw.span)).unwrap_or(let_kw.span);
+        let span = let_kw.span.concat(&terminator.map(|t| t.span).unwrap_or(value.span));
 
         Stmt { kind: StmtKind::Let { name, value }, span }
     }
@@ -150,7 +150,7 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         let expr = self.parse_expression(0);
         let terminator = self.expect_terminator();
 
-        let span = terminator.map(|t| t.span.concat(&expr.span)).unwrap_or(expr.span);
+        let span = expr.span.concat(&terminator.map(|t| t.span).unwrap_or(expr.span));
 
         Stmt { kind: StmtKind::Expr(expr), span }
     }
@@ -160,14 +160,13 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         self.skip_newlines();
         match self.peek_token() {
             Token { kind: TokenKind::Semicolon, .. } => self.stream.next(),
-            Token { kind: TokenKind::RBrace | TokenKind::EOF, .. } => None,
+            Token { kind: TokenKind::RBrace, .. } => None,
+            _ if save != self.stream.get_position() => {
+                self.stream.set_position(save);
+                self.stream.next()
+            }
+            Token { kind: TokenKind::EOF, .. } => self.stream.next(),
             other => {
-                // skipped at least one newline
-                if save != self.stream.get_position() {
-                    self.stream.set_position(save);
-                    return self.stream.next();
-                }
-
                 self.diags.emit(
                     Diagnostic::error("missing statement terminator")
                     .with_span(other.span)
@@ -178,7 +177,6 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         }
     }
 
-    // FIXME: This might recover beyond a scope termination.
     fn recover_to_stmt_start(&mut self) {
         let mut save = self.stream.get_position();
         while let Some(tok) = self.stream.next() {
@@ -319,7 +317,7 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
             }
         };
 
-        let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
+        let span = tok.span.concat(&closing_tok.map(|t| t.span).unwrap_or(expr.span));
 
         Expr { span, ..expr }
     }
@@ -348,13 +346,20 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
             }
         };
 
-        let span = closing_tok.map(|t| t.span.concat(&tok.span)).unwrap_or(tok.span);
-
-        let tail_expr = match stmts.pop() {
-            Some(Stmt { kind: StmtKind::Expr(expr), span }) if expr.span == span => Some(Box::new(expr)),
-            Some(other) => { stmts.push(other); None }
+        let tail_expr = match stmts.last() {
+            Some(Stmt { kind: StmtKind::Expr(expr), span }) if expr.span == *span => {
+                let Stmt { kind: StmtKind::Expr(expr), .. } = stmts.pop().unwrap() else { unreachable!() };
+                Some(Box::new(expr))
+            }
             _ => None,
         };
+
+        // yes, I know this is a lot but it makes sense. ( "{" -> last stmt -> tail expr -> "}" )
+        let span = tok.span.concat(&closing_tok.map(|t| t.span)
+            .or(tail_expr.as_ref().map(|e| e.span))
+            .or(stmts.last().map(|s| s.span))
+            .unwrap_or(tok.span)
+        );
 
         Expr {
             kind: ExprKind::Block { stmts, tail_expr },
@@ -467,10 +472,10 @@ let a = x + 2\r
                         },
                         span: Span::new(40, 46)
                     }),
-                    span: Span::new(40, 46)
+                    span: Span::new(40, 48)
                 }
             ],
-            span: Span::new(2, 46),
+            span: Span::new(2, 48),
         };
 
         assert_eq!(parser.parse_program(), expected);

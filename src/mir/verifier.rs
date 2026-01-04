@@ -72,6 +72,11 @@ impl FunctionIRVerifier<'_> {
                 self.verify_place(place);
                 self.verify_rval(rval);
             }
+            Instr::Debug(info) => {
+                if let DebugKind::DeclareLocal { local, .. } = info.kind {
+                    self.verify_local(local);
+                }
+            }
         }
     }
 

@@ -66,8 +66,10 @@ impl MirBuilder<'_> {
     fn lower_stmt(&mut self, stmt: t::Stmt) {
         match stmt.kind {
             t::StmtKind::Let { sym, value } => {
-                let local = self.new_local(self.symbols.get(sym).ty.clone().expect("[Lowerer] Internal Error: local var symbol has no type annotation"));
+                let symbol = self.symbols.get(sym);
+                let local = self.new_local(symbol.ty.clone().expect("[Lowerer] Internal Error: local var symbol has no type annotation"));
                 self.env.insert(sym, local);
+                self.emit(Instr::Debug(DebugInfo { span: stmt.span, kind: DebugKind::DeclareLocal { local, name: symbol.name.clone() } }));
                 self.lower_expr(Place { local, projection: Vec::new() }, value);
             }
             t::StmtKind::Expr(expr) => {
@@ -80,6 +82,7 @@ impl MirBuilder<'_> {
     }
 
     fn lower_expr(&mut self, dest: Place, expr: t::Expr) {
+        self.emit(Instr::Debug(DebugInfo { span: expr.span, kind: DebugKind::EnterExpr }));
         let rval = match expr.kind {
             t::ExprKind::Number { value, .. } => RValue::Use(Operand::Const(Const::Number(value))),
 
@@ -112,6 +115,7 @@ impl MirBuilder<'_> {
         };
 
         self.emit(Instr::Assign(dest, rval));
+        self.emit(Instr::Debug(DebugInfo { span: expr.span, kind: DebugKind::ExitExpr }));
     }
 }
 
