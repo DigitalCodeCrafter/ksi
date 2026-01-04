@@ -1,4 +1,3 @@
-use crate::common::Span;
 use crate::common::diagnostics::*;
 use crate::semantics::{
     resolver::SymbolTable,
@@ -6,8 +5,8 @@ use crate::semantics::{
     typed_ast as t,
 };
 
-pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, _diagnostics: &mut impl DiagnosticSink) -> t::TypedAst {
-    let mut tc = TypeChecker::new(symbols);
+pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, diagnostics: &mut impl DiagnosticSink) -> t::TypedAst {
+    let mut tc = TypeChecker::new(symbols, diagnostics);
     tc.type_check(resolved_ast)
 }
 
@@ -19,21 +18,16 @@ pub enum Type {
     Error,
 }
 
-pub enum TypeError {
-    Mismatch(Type, Type, Span),
-    UntypedSymbol(Span),
-}
-
-struct TypeChecker<'a> {
+struct TypeChecker<'a, 'd, D: DiagnosticSink> {
     symbols: &'a mut SymbolTable,
-    errors: Vec<TypeError>
+    diags: &'d mut D,
 }
 
-impl<'a> TypeChecker<'a> {
-    fn new(symbols: &'a mut SymbolTable) -> Self {
+impl<'a, 'd, D: DiagnosticSink> TypeChecker<'a, 'd, D> {
+    fn new(symbols: &'a mut SymbolTable, diags: &'d mut D) -> Self {
         Self {
             symbols,
-            errors: Vec::new(),
+            diags,
         }
     }
 
@@ -49,8 +43,7 @@ impl<'a> TypeChecker<'a> {
     }
 }
 
-
-impl TypeChecker<'_> {
+impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
     fn check_stmt(&mut self, stmt: r::Stmt) -> t::Stmt {
         let kind = match stmt.kind {
             r::StmtKind::Let { sym, value } => {
@@ -78,10 +71,7 @@ impl TypeChecker<'_> {
                 let ty = self.symbols
                     .get(sym).ty
                     .clone()
-                    .unwrap_or_else(|| {
-                        self.errors.push(TypeError::UntypedSymbol(expr.span));
-                        Type::Error
-                    });
+                    .expect(&format!("[Typechecker] Internal error: tried to get type of the untyped symbol {:?}", sym));
                 
                 t::Expr {
                     kind: t::ExprKind::Identifier { sym },
@@ -132,12 +122,16 @@ impl TypeChecker<'_> {
         let mut t_expr = self.infer(expr);
 
         if t_expr.ty != expected && !matches!(t_expr.ty, Type::Error | Type::Never) {
-            self.errors.push(TypeError::Mismatch(t_expr.ty.clone(), expected, t_expr.span));
+            self.diags.emit(
+                Diagnostic::error("type mismatch")
+                .with_span(t_expr.span)
+                .note(format!("expected type: {:?}", expected))
+                .note(format!("actual type: {:?}", t_expr.ty))
+            );
             t_expr.ty = Type::Error
         }
 
         t_expr
     }
 }
-
 
