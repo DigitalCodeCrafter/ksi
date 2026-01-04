@@ -1,7 +1,7 @@
-use ksi::{backend, common::diagnostics::sinks::Diagnostics, ir, semantics, syntax};
+use ksi::{backend, common::diagnostics::sinks::Diagnostics, mir, semantics, syntax};
 
 
-fn main() {
+fn main() -> Result<(), ()> {
     let file_path = std::env::args().nth(1).expect("Missing file path");
 
     let content = std::fs::read_to_string(file_path).unwrap();
@@ -9,12 +9,14 @@ fn main() {
     let mut diagnostics = Diagnostics::empty();
     let parsed_ast = syntax::parse(&content, &mut diagnostics);
     let (typed_ast, symbols) = semantics::analyze(parsed_ast, &mut diagnostics);
-    let prog_ir = ir::lower(typed_ast, &symbols, &mut diagnostics);
-
     if diagnostics.has_error() {
         eprintln!("{:#?}", diagnostics.diagnostics);
-        std::process::exit(1);
+        return Err(());
     }
+
+    let prog_ir = mir::lower(typed_ast, &symbols, &mut diagnostics);
+
+    mir::verify_ir(&prog_ir)?;
 
     let out = backend::emit(&prog_ir, &mut diagnostics);
 
@@ -22,6 +24,7 @@ fn main() {
         eprintln!("{:#?}", diagnostics.diagnostics);
     }
 
-    println!("{}", out)
+    println!("{}", out);
+    Ok(()) 
 }
 

@@ -1,34 +1,24 @@
-use std::collections::HashMap;
-use crate::ir::*;
+use crate::mir::*;
 
 // TODO: REFACTOR THIS 100%
 
-pub struct KosEmitter<'a> {
+pub struct KosEmitter {
     indent: usize,
     out: String,
-    temp_exprs: HashMap<TempId, &'a Instr>
 }
-impl<'e> KosEmitter<'e> {
-    pub fn emit_program(prog: &ProgramIR) -> String {
+impl KosEmitter {
+    pub fn emit_program(prog: &Body) -> String {
         let mut emitter = KosEmitter {
             indent: 0,
             out: String::new(),
-            temp_exprs: HashMap::new(),
         };
 
-        for (fidx, func) in prog.functions.iter().enumerate() {
-            emitter.emit_function(&format!("f{}", fidx), func);
-        }
+        emitter.emit_function("main", prog);
 
-        if !prog.functions.is_empty() {
-            emitter.emitln("f0().");
-        }
+        
+        emitter.emit("main().\n");
 
         emitter.out
-    }
-
-    fn emit_local(&mut self, id: LocalId) {
-        self.out.push_str(&format!("l{}", id.index()))
     }
 
     fn emit_const(&mut self, c: &Const) {
@@ -38,62 +28,48 @@ impl<'e> KosEmitter<'e> {
         }
     }
 
-    fn emit_value(&mut self, v: &Value) {
-        match v {
-            Value::Const(c) => self.emit_const(c),
-            Value::Temp(id) => {
-                let instr = *self.temp_exprs.get(id).unwrap();
-                self.emit_instr(instr);
-            },
+    fn emit_operand(&mut self, op: &Operand) {
+        match op {
+            Operand::Const(c) => self.emit_const(c),
+            Operand::Move(place) | Operand::Copy(place) => self.emit_place(place),
         }
     }
 
     fn emit_place(&mut self, p: &Place) {
-        match p {
-            Place::Local(id) => self.emit_local(*id),
+        self.emit(&format!("l{}", p.local.index()));
+    }
+
+    fn emit_rval(&mut self, rval: &RValue) {
+        match rval {
+            RValue::Use(op) => self.emit_operand(op),
+
+            RValue::Binary(op, lhs, rhs) => {
+                let op_str = match op {
+                    BinaryOp::Add => " + ",
+                    BinaryOp::Sub => " - ",
+                    BinaryOp::Mul => " * ",
+                    BinaryOp::Div => " / ",
+                };
+                self.emit_operand(lhs);
+                self.emit(op_str);
+                self.emit_operand(rhs);
+            }
+
+            RValue::Poison => {
+                todo!("TOOD: Some good way to handle this.")
+            }
         }
     }
 
-    fn emit_instr(&mut self, instr: &'e Instr) {
+    fn emit_instr(&mut self, instr: &Instr) {
         match instr {
-            Instr::LoadConst { dst, value } => {
-                if self.temp_exprs.insert(*dst, instr).is_some() {
-                    self.emit_const(value);
-                    // self.temp_exprs.remove(dst);
-                }
-            }
-            Instr::Binary { dst, op, lhs, rhs } => {
-                if self.temp_exprs.insert(*dst, instr).is_some() {
-                    let op_str = match op {
-                        BinaryOp::Add => "+",
-                        BinaryOp::Sub => "-",
-                        BinaryOp::Mul => "*",
-                        BinaryOp::Div => "/",
-                    };
-                    self.emit_value(lhs);
-                    self.emit(" ");
-                    self.emit(op_str);
-                    self.emit(" ");
-                    self.emit_value(rhs);
-                    // self.temp_exprs.remove(dst);
-                }
-            }
-            Instr::Store { place, value } => {
+            Instr::Assign(place, rval) => {
                 self.emit_indent();
                 self.emit("set ");
                 self.emit_place(place);
                 self.emit(" to ");
-                self.emit_value(value);
-                self.emitln(".");
-            }
-            Instr::Load { dst, place} => {
-                if self.temp_exprs.insert(*dst, instr).is_some() {
-                    self.emit_place(place);
-                    // self.temp_exprs.remove(dst);
-                }
-            }
-            Instr::Poision { .. } => {
-                todo!("TOOD: Some good way to handle this.")
+                self.emit_rval(rval);
+                self.emit(".\n");
             }
         }
     }
@@ -102,23 +78,23 @@ impl<'e> KosEmitter<'e> {
         self.emit_indent();
         match term {
             Terminator::Goto(_) => todo!("Some good way to handle this too."),
-            Terminator::Return(v) => {
+            Terminator::Return(op) => {
                 self.emit("return ");
-                self.emit_value(v);
-                self.emitln(".");
+                self.emit_operand(op);
+                self.emit(".\n");
             }
             Terminator::Unreachable => {
-                self.emitln("print \"UNREACHABLE has been reached\".");
-                self.emitln("shutdown.");
+                self.emit("print \"UNREACHABLE has been reached\".\n");
+                self.emit("wait until false.\n");
             }
         }
     }
 
-    fn emit_block(&mut self, id: usize, block: &'e Block) {
+    fn emit_block(&mut self, id: usize, block: &Block) {
         self.emit_indent();
         self.emit("// block");
         self.emit(&id.to_string());
-        self.emitln(":");
+        self.emit(":\n");
 
         for instr in &block.instrs {
             self.emit_instr(instr);
@@ -126,11 +102,11 @@ impl<'e> KosEmitter<'e> {
         self.emit_terminator(&block.terminator);
     }
 
-    fn emit_function(&mut self, name: &str, func: &'e FunctionIR) {
+    fn emit_function(&mut self, name: &str, func: &Body) {
         self.emit_indent();
         self.emit("function ");
         self.emit(name);
-        self.emitln(" {");
+        self.emit(" {\n");
 
         self.increase_indent();
 
@@ -138,7 +114,7 @@ impl<'e> KosEmitter<'e> {
             self.emit_indent();
             self.emit("local l");
             self.emit(&lidx.to_string());
-            self.emitln(" is 0.");
+            self.emit(" is 0.\n");
         }
 
         for (bidx, block) in func.blocks.iter().enumerate() {
@@ -146,7 +122,7 @@ impl<'e> KosEmitter<'e> {
         }
 
         self.decrease_indent();
-        self.emitln("}\n");
+        self.emit("}\n\n");
     }
 
     fn emit_indent(&mut self) {
@@ -155,11 +131,6 @@ impl<'e> KosEmitter<'e> {
 
     fn emit(&mut self, str: &str) {
         self.out.push_str(str);
-    }
-
-    fn emitln(&mut self, str: &str) {
-        self.out.push_str(str);
-        self.out.push('\n');
     }
 
     fn increase_indent(&mut self) {
