@@ -10,9 +10,9 @@ pub fn lower(typed_ast: t::TypedAst, symbols: &SymbolTable, _diagnostics: &mut i
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct LocalId(u32);
+pub struct LocalId(pub(super) u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BlockId(u32);
+pub struct BlockId(pub(super) u32);
 
 impl LocalId {
     pub fn index(&self) -> u32 { self.0 }
@@ -69,8 +69,8 @@ impl MirBuilder<'_> {
                 let symbol = self.symbols.get(sym);
                 let local = self.new_local(symbol.ty.clone().expect("[Lowerer] Internal Error: local var symbol has no type annotation"));
                 self.env.insert(sym, local);
-                self.emit(Instr::Debug(DebugInfo { span: stmt.span, kind: DebugKind::DeclareLocal { local, name: symbol.name.clone() } }));
                 self.lower_expr(Place { local, projection: Vec::new() }, value);
+                self.emit(Instr::Debug(DebugInfo { span: stmt.span, kind: DebugKind::DeclareLocal { local, name: symbol.name.clone() } }));
             }
             t::StmtKind::Expr(expr) => {
                 let unused = Place { local: self.new_local(expr.ty.clone()), projection: Vec::new() };
@@ -82,7 +82,6 @@ impl MirBuilder<'_> {
     }
 
     fn lower_expr(&mut self, dest: Place, expr: t::Expr) {
-        self.emit(Instr::Debug(DebugInfo { span: expr.span, kind: DebugKind::EnterExpr }));
         let rval = match expr.kind {
             t::ExprKind::Number { value, .. } => RValue::Use(Operand::Const(Const::Number(value))),
 
@@ -101,13 +100,16 @@ impl MirBuilder<'_> {
             }
 
             t::ExprKind::Block { stmts, tail_expr } => {
+                self.emit(Instr::Debug(DebugInfo { span: expr.span, kind: DebugKind::EnterScope }));
                 for stmt in stmts {
                     self.lower_stmt(stmt);
                 }
 
+                self.emit(Instr::Debug(DebugInfo { span: expr.span, kind: DebugKind::ExitScope }));
+                
                 match tail_expr {
                     Some(expr) => return self.lower_expr(dest, *expr),
-                    None => RValue::Use(Operand::Const(Const::Unit)),
+                    None => RValue::Use(Operand::Const(Const::Unit))
                 }
             }
 
@@ -115,7 +117,6 @@ impl MirBuilder<'_> {
         };
 
         self.emit(Instr::Assign(dest, rval));
-        self.emit(Instr::Debug(DebugInfo { span: expr.span, kind: DebugKind::ExitExpr }));
     }
 }
 

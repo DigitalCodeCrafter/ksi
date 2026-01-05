@@ -1,4 +1,4 @@
-use ksi::{backend, common::diagnostics::sinks::Diagnostics, mir::{self, pretty}, semantics, syntax};
+use ksi::{backend, common::diagnostics::sinks::Diagnostics, mir::{self, passes::{ConstPropagation, CopyPropagation, DeadLocalElim, Pass, run_passes}, pretty}, semantics, syntax};
 
 
 fn main() -> Result<(), ()> {
@@ -14,9 +14,15 @@ fn main() -> Result<(), ()> {
         return Err(());
     }
 
-    let prog_ir = mir::lower(typed_ast, &symbols, &mut diagnostics);
+    let mut prog_ir = mir::lower(typed_ast, &symbols, &mut diagnostics);
 
-    mir::verify_ir(&prog_ir)?;
+    let mut passes: Vec<Box<dyn Pass>> = vec![
+        Box::new(CopyPropagation),
+        Box::new(ConstPropagation),
+        Box::new(DeadLocalElim)
+    ];
+
+    run_passes(&mut prog_ir, &mut passes);
 
     let out = backend::emit(&prog_ir, &mut diagnostics);
 

@@ -1,20 +1,20 @@
 use crate::mir::{BlockId, lowerer::LocalId, mir::*};
 
-pub fn verify_ir(ir: &Body) -> Result<(), ()> {
-    let mut verifier = FunctionIRVerifier { ir, errors: Vec::new() };
+pub fn verify_body(body: &Body) -> Result<(), ()> {
+    let mut verifier = IRVerifier { ir: body, errors: Vec::new() };
     verifier.verify_entry_exists();
-    for block in &ir.blocks {
+    for block in &body.blocks {
         verifier.verify_block(block);
     }
     verifier.throw()
 }
 
-struct FunctionIRVerifier<'a> {
+struct IRVerifier<'a> {
     ir: &'a Body,
     errors: Vec<String>,
 }
 
-impl FunctionIRVerifier<'_> {
+impl IRVerifier<'_> {
     fn throw(self) -> Result<(), ()> {
         if self.errors.is_empty() { return Ok(()); }
         for e in self.errors {

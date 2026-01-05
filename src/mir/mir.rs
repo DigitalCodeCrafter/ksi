@@ -45,18 +45,18 @@ pub enum Operand {
     Const(Const),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Place {
     pub local: LocalId,
     pub projection: Vec<Projection>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Projection {
     
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Const {
     Number(f64),
     Unit,
@@ -70,8 +70,8 @@ pub struct DebugInfo {
 
 #[derive(Debug, PartialEq)]
 pub enum DebugKind {
-    EnterExpr,
-    ExitExpr,
+    EnterScope,
+    ExitScope,
     DeclareLocal {
         local: LocalId,
         name: String,

@@ -43,8 +43,8 @@ pub fn format_rval(rv: &RValue) -> String {
 
 pub fn format_debug_info(info: &DebugInfo) -> String {
     let note = match &info.kind {
-        DebugKind::EnterExpr => "enter expression".to_string(),
-        DebugKind::ExitExpr => "exit expression".to_string(),
+        DebugKind::EnterScope => "enter scope".to_string(),
+        DebugKind::ExitScope => "exit scope".to_string(),
         DebugKind::DeclareLocal { local, name } => format!("{} := l{}", name, local.index()),
     };
     format!("[{}..{}] debug: {}", info.span.start, info.span.end, note)
