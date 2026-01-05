@@ -49,8 +49,10 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_program(&mut self) -> ParsedAst<'a> {
         let mut stmts = Vec::new();
 
+        self.skip_newlines();
         while !matches!(self.stream.peek_with(LexHint::Any).map(|t| t.kind), Some(TokenKind::EOF) | None) {
             stmts.push(self.parse_statement());
+            self.skip_newlines();
         }
 
         let span = stmts.first()
@@ -69,7 +71,14 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
 impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn next_token(&mut self) -> Token {
-        self.stream.next().expect("[Parser] Internal error: Unexpected end of token stream")
+        let tok = self.stream.next().expect("[Parser] Internal error: Unexpected end of token stream");
+        if tok.kind == TokenKind::Unknown {
+            self.diags.emit(
+                Diagnostic::error("unknown token")
+                .with_span(tok.span)
+            );
+        };
+        tok
     }
 
     fn peek_token(&mut self) -> Token {

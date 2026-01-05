@@ -81,7 +81,13 @@ impl Lexer<'_> {
 
 impl Lexer<'_> {
     fn next_token(&mut self, hint: LexHint) -> Token {
-       self.skip_whitespace();
+        let mut changed = true;
+        while changed {
+            let start = self.pos;
+            self.skip_whitespace();
+            self.skip_comment();
+            changed = start != self.pos;
+        }
 
         let Some(c) = self.peek_char() else {
             return self.emit_eof();
@@ -132,6 +138,37 @@ impl Lexer<'_> {
         }
     }
 
+    fn skip_comment(&mut self) {
+        let save = self.pos;
+        if matches!(self.peek_char(), Some('/')) {
+            self.advance_char();
+            match self.peek_char() {
+                Some('/') => {
+                    self.advance_char();
+                    while let Some(c) = self.peek_char() {
+                        if c == '\n' { break; }
+                        self.advance_char();
+                    }
+                },
+                Some('*') => {
+                    self.advance_char();
+                    let mut counter = 1;
+                    let mut last_c = ' ';
+                    while let Some(c) = self.advance_char() {
+                        match (last_c, c) {
+                            ('*', '/') => counter -= 1,
+                            ('/', '*') => counter += 1,
+                            _ => {},
+                        }
+                        if counter == 0 { break; }
+                        last_c = c;
+                    }
+                },
+                _ => self.pos = save
+            }
+        }
+    }
+
     fn lex_number(&mut self, hint: LexHint) -> Token {
         let start = self.pos;
 
@@ -140,8 +177,8 @@ impl Lexer<'_> {
         }
 
         if matches!(hint, LexHint::Any) {
+            let save = self.pos;
             if self.peek_char() == Some('.') {
-                let save = self.pos;
                 self.advance_char();
 
                 if matches!(self.peek_char(), Some(c) if c.is_ascii_digit()) {
@@ -155,8 +192,8 @@ impl Lexer<'_> {
         }
 
         if matches!(hint, LexHint::Any) {
+            let save = self.pos;
             if matches!(self.peek_char(), Some('e' | 'E')) {
-                let save = self.pos;
                 self.advance_char();
 
                 if matches!(self.peek_char(), Some('+' | '-')) {
