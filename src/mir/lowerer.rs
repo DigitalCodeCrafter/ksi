@@ -136,7 +136,7 @@ impl MirBuilder<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{common::diagnostics::sinks::AssertErrors, mir::pretty, semantics, syntax};
+    use crate::{common::{Span, diagnostics::sinks::AssertErrors}, mir::pretty, semantics, syntax};
     use super::*;
 
     #[test]
@@ -168,12 +168,14 @@ let y = x - 3
                         Operand::Move(Place { local: LocalId(1), projection: vec![] }), 
                         Operand::Move(Place { local: LocalId(2), projection: vec![] })
                     )),
+                    Instr::Debug(DebugInfo { span: Span::new(1, 15), kind: DebugKind::DeclareLocal { local: LocalId(0), name: "x".to_string() } }),
                     Instr::Assign(Place { local: LocalId(4), projection: vec![] }, RValue::Use(Operand::Copy(Place { local: LocalId(0), projection: vec![] }))),
                     Instr::Assign(Place { local: LocalId(5), projection: vec![] }, RValue::Use(Operand::Const(Const::Number(3.0)))),
                     Instr::Assign(Place { local: LocalId(3), projection: vec![] }, RValue::Binary(BinaryOp::Sub, 
                         Operand::Move(Place { local: LocalId(4), projection: vec![] }), 
                         Operand::Move(Place { local: LocalId(5), projection: vec![] })
                     )),
+                    Instr::Debug(DebugInfo { span: Span::new(15, 29), kind: DebugKind::DeclareLocal { local: LocalId(3), name: "y".to_string() } }),
                 ],
                 terminator: Terminator::Return(Operand::Const(Const::Unit)),
             }]
