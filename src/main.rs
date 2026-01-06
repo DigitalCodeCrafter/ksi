@@ -25,16 +25,18 @@ fn main() -> Result<(), ()> {
 
     run_passes(&mut prog_ir, &mut passes);
 
-    let out = backend::emit(&prog_ir, &mut diagnostics);
-
-    render_all(&content, &line_starts, &diagnostics.diagnostics);
-
-    let pretty_ir = pretty::format_body(&prog_ir, "main");
-    for line in pretty_ir.lines() {
-        println!("// {}", line);
-    }
-
-    println!("\n\n{}", out);
+    
+    // let out = backend::emit(&prog_ir, &mut diagnostics);
+    
+    // render_all(&content, &line_starts, &diagnostics.diagnostics);
+    
+    /*let pretty_ir = */ println!("{}", pretty::format_body(&prog_ir, "main"));
+    // for line in pretty_ir.lines() {
+    //     println!("// {}", line);
+    // }
+        
+    backend::ks::print_doms(&prog_ir);
+    // println!("\n\n{}", out);
     Ok(()) 
 }
 

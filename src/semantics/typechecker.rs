@@ -264,6 +264,7 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
 
             (Number, Number) => Some(Number),
             (Bool, Bool) => Some(Bool),
+            (Unit, Unit) => Some(Unit),
 
             _ => None,
         }

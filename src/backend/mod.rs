@@ -1,4 +1,5 @@
 mod kerboscript;
+pub mod ks;
 
 
 use crate::common::diagnostics::DiagnosticSink;

@@ -423,6 +423,7 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_if_expr(&mut self, tok: Token) -> Expr<'a> {
         let cond = self.parse_expression(0);
 
+        self.skip_newlines();
         let then_branch = match self.peek_token() {
             token @ Token { kind: TokenKind::LBrace, .. } => {
                 self.stream.next();
@@ -437,8 +438,11 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
             }
         };
 
+        let save = self.stream.get_position();
+        self.skip_newlines();
         let else_branch = if matches!(self.peek_token().kind, TokenKind::Else) {
             self.stream.next();
+            self.skip_newlines();
             match self.peek_token() {
                 token @ Token { kind: TokenKind::LBrace, .. } => {
                     self.stream.next();
@@ -453,10 +457,12 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
                         Diagnostic::error("expected a block")
                         .with_span(other.span)
                     );
+                    self.stream.set_position(save);
                     Some(Expr { kind: ExprKind::Block { stmts: vec![], tail_expr: None }, span: Span::new(other.span.start, other.span.start) })
                 }
             }
         } else {
+            self.stream.set_position(save);
             None
         };
 

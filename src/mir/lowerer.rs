@@ -10,9 +10,9 @@ pub fn lower(typed_ast: t::TypedAst, symbols: &SymbolTable, _diagnostics: &mut i
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct LocalId(pub(super) u32);
+pub struct LocalId(pub u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BlockId(pub(super) u32);
+pub struct BlockId(pub u32);
 
 impl LocalId {
     pub fn index(&self) -> u32 { self.0 }
