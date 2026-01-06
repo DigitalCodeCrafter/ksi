@@ -95,6 +95,9 @@ impl KosEmitter {
         self.emit_indent();
         match term {
             Terminator::Goto(_) => todo!("Some good way to handle this too."),
+
+            Terminator::Branch(_, _, _) => todo!("Some good way to handle this... "),
+
             Terminator::Return(op) => {
                 self.emit("return ");
                 self.emit_operand(op);

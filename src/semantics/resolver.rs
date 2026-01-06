@@ -240,6 +240,12 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                 self.current_scope = outer;
                 r::ExprKind::Block { stmts: resolved_stmts, tail_expr: resolved_expr }
             }
+            p::ExprKind::If { cond, then_branch, else_brach } => {
+                let resolved_cond = self.resolve_expr(*cond);
+                let resolved_then = self.resolve_expr(*then_branch);
+                let resolved_else = else_brach.map(|b| self.resolve_expr(*b));
+                r::ExprKind::If { cond: Box::new(resolved_cond), then_branch: Box::new(resolved_then), else_branch: resolved_else.map(Box::new) }
+            }
             p::ExprKind::Error(e) => r::ExprKind::Error(e),
         };
 

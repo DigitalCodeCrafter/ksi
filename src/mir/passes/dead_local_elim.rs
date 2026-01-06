@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::mir::{Block, DebugKind, Instr, LocalId, Operand, Place, RValue, passes::Pass};
+use crate::mir::{Block, DebugKind, Instr, LocalId, Operand, Place, RValue, Terminator, passes::Pass};
 
 
 pub struct DeadLocalElim;
@@ -44,6 +44,7 @@ fn find_live_in_block(used: &mut HashSet<LocalId>, block: &Block) {
             }
         }
     }
+    find_live_in_term(used, &block.terminator);
 }
 
 fn find_live_in_rval(used: &mut HashSet<LocalId>, rval: &RValue) {
@@ -55,6 +56,15 @@ fn find_live_in_rval(used: &mut HashSet<LocalId>, rval: &RValue) {
             find_live_in_op(used, rhs);
         }
         RValue::Poison => {},
+    }
+}
+
+fn find_live_in_term(used: &mut HashSet<LocalId>, term: &Terminator) {
+    match term {
+        Terminator::Goto(_) => {},
+        Terminator::Return(op) => find_live_in_op(used, op),
+        Terminator::Branch(op, _, _) => find_live_in_op(used, op),
+        Terminator::Unreachable => {},
     }
 }
 
@@ -85,6 +95,7 @@ fn remap_in_block(remap: &[Option<LocalId>], block: &mut Block) {
             }
         }
     });
+    remap_in_term(remap, &mut block.terminator);
 }
 
 fn remap_in_rval(remap: &[Option<LocalId>], rval: &mut RValue) {
@@ -96,6 +107,15 @@ fn remap_in_rval(remap: &[Option<LocalId>], rval: &mut RValue) {
             remap_in_op(remap, rhs);
         }
         RValue::Poison => {},
+    }
+}
+
+fn remap_in_term(remap: &[Option<LocalId>], term: &mut Terminator) {
+    match term {
+        Terminator::Goto(_) => {},
+        Terminator::Return(op) => remap_in_op(remap, op),
+        Terminator::Branch(op, _, _) => remap_in_op(remap, op),
+        Terminator::Unreachable => {},
     }
 }
 

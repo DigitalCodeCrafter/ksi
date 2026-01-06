@@ -10,6 +10,14 @@ pub fn interpret_program<'a>(body: &'a Body) -> Const {
         interpret_block(&body.blocks[next_block], &mut env);
         match &body.blocks[next_block].terminator {
             Terminator::Goto(bid) => next_block = bid.index() as usize,
+            Terminator::Branch(op, then_block, else_block) => {
+                let val = eval_operand(op, &env);
+                match val {
+                    Const::Bool(true) => next_block = then_block.index() as usize,
+                    Const::Bool(false) => next_block = else_block.index() as usize,
+                    _ => panic!("Invalid MIR"),
+                }
+            }
             Terminator::Return(op) => break eval_operand(op, &env),
             Terminator::Unreachable => panic!("Invalid MIR"),
         }

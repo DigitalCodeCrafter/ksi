@@ -266,36 +266,41 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn get_op(kind: TokenKind) -> Operator<'a, 'd, D> {
         use TokenKind as k;
         match kind {
-            k::Identifier  => Operator::nud_op(Self::parse_var),
-            k::Number      => Operator::nud_op(Self::parse_number),
-            k::True        => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(true)), span: t.span }),
-            k::False       => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(false)), span: t.span }),
+            k::Identifier   => Operator::nud_op(Self::parse_var),
+            k::Number       => Operator::nud_op(Self::parse_number),
+            k::True         => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(true)), span: t.span }),
+            k::False        => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(false)), span: t.span }),
 
-            k::Plus        => Operator::led_op(6, Self::parse_binary_op),
-            k::Minus       => Operator { lbp: 6, nud: Some(Self::parse_unary_op), led: Some(Self::parse_binary_op) },
-            k::Star        => Operator::led_op(8, Self::parse_binary_op),
-            k::Slash       => Operator::led_op(8, Self::parse_binary_op),
+            k::Plus         => Operator::led_op(6, Self::parse_binary_op),
+            k::Minus        => Operator { lbp: 6, nud: Some(Self::parse_unary_op), led: Some(Self::parse_binary_op) },
+            k::Star         => Operator::led_op(8, Self::parse_binary_op),
+            k::Slash        => Operator::led_op(8, Self::parse_binary_op),
 
-            k::Gt          => Operator::led_op(4, Self::parse_binary_op),
-            k::Lt          => Operator::led_op(4, Self::parse_binary_op),
-            k::GtEq        => Operator::led_op(4, Self::parse_binary_op),
-            k::LtEq        => Operator::led_op(4, Self::parse_binary_op),
-            k::Eq          => Operator::led_op(2, Self::parse_binary_op),
-            k::NotEq       => Operator::led_op(2, Self::parse_binary_op),
-            // And         => Operator::led_op(0, Self::parse_binary_op),
-            // Or          => Operator::led_op(0, Self::parse_binary_op),
+            k::Gt           => Operator::led_op(4, Self::parse_binary_op),
+            k::Lt           => Operator::led_op(4, Self::parse_binary_op),
+            k::GtEq         => Operator::led_op(4, Self::parse_binary_op),
+            k::LtEq         => Operator::led_op(4, Self::parse_binary_op),
+            k::Eq           => Operator::led_op(2, Self::parse_binary_op),
+            k::NotEq        => Operator::led_op(2, Self::parse_binary_op),
+            // And          => Operator::led_op(0, Self::parse_binary_op),
+            // Or           => Operator::led_op(0, Self::parse_binary_op),
 
-            k::Assign      => Operator::not_an_op(), // TODO
-            k::Dot         => Operator::not_an_op(), // TODO
-            k::Semicolon   => Operator::not_an_op(),
-            k::LParen      => Operator::nud_op(Self::parse_parathesised),
-            k::RParen      => Operator::not_an_op(),
-            k::LBrace      => Operator::nud_op(Self::parse_block),
-            k::RBrace      => Operator::not_an_op(),
-            k::Let         => Operator::not_an_op(),
-            k::Newline     => Operator::not_an_op(),
-            k::Unknown     => Operator::not_an_op(),
-            k::EOF         => Operator::not_an_op(),
+            k::If           => Operator::nud_op(Self::parse_if_expr),
+            k::Else         => Operator::not_an_op(),
+
+            k::LParen       => Operator::nud_op(Self::parse_parathesised),
+            k::RParen       => Operator::not_an_op(),
+
+            k::LBrace       => Operator::nud_op(Self::parse_block),
+            k::RBrace       => Operator::not_an_op(),
+
+            k::Assign       => Operator::not_an_op(),
+            k::Dot          => Operator::not_an_op(),
+            k::Semicolon    => Operator::not_an_op(),
+            k::Let          => Operator::not_an_op(),
+            k::Newline      => Operator::not_an_op(),
+            k::Unknown      => Operator::not_an_op(),
+            k::EOF          => Operator::not_an_op(),
         }
     }
 
@@ -411,6 +416,58 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
         Expr {
             kind: ExprKind::Block { stmts, tail_expr },
+            span,
+        }
+    }
+
+    fn parse_if_expr(&mut self, tok: Token) -> Expr<'a> {
+        let cond = self.parse_expression(0);
+
+        let then_branch = match self.peek_token() {
+            token @ Token { kind: TokenKind::LBrace, .. } => {
+                self.stream.next();
+                self.parse_block(token)
+            }
+            other => {
+                self.diags.emit(
+                    Diagnostic::error("expected a block")
+                    .with_span(other.span)
+                );
+                Expr { kind: ExprKind::Block { stmts: vec![], tail_expr: None }, span: Span::new(other.span.start, other.span.start) }
+            }
+        };
+
+        let else_branch = if matches!(self.peek_token().kind, TokenKind::Else) {
+            self.stream.next();
+            match self.peek_token() {
+                token @ Token { kind: TokenKind::LBrace, .. } => {
+                    self.stream.next();
+                    Some(self.parse_block(token))
+                }
+                token @ Token { kind: TokenKind::If, .. } => {
+                    self.stream.next();
+                    Some(self.parse_if_expr(token))
+                }
+                other => {
+                    self.diags.emit(
+                        Diagnostic::error("expected a block")
+                        .with_span(other.span)
+                    );
+                    Some(Expr { kind: ExprKind::Block { stmts: vec![], tail_expr: None }, span: Span::new(other.span.start, other.span.start) })
+                }
+            }
+        } else {
+            None
+        };
+
+        let span = tok.span.concat(&else_branch.as_ref().map(|b| b.span).unwrap_or(then_branch.span));
+
+        Expr {
+            kind: ExprKind::If {
+                cond: Box::new(cond),
+                then_branch: Box::new(then_branch),
+                else_brach: else_branch.map(Box::new)
+            },
             span,
         }
     }

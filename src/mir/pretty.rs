@@ -76,6 +76,7 @@ pub fn format_instr(i: &Instr) -> String {
 pub fn format_terminator(t: &Terminator) -> String {
     match t {
         Terminator::Goto(b) => format!("goto block{}", b.index()),
+        Terminator::Branch(op, then_block, else_block) => format!("branch {} [then -> block{}, else -> block{}]", format_operand(op), then_block.index(), else_block.index()),
         Terminator::Return(op) => format!("return {}", format_operand(op)),
         Terminator::Unreachable => "unreachable".to_string(),
     }

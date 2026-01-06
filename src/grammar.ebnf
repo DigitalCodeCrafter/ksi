@@ -22,6 +22,7 @@ nud = Number
     | "-", Expression
     | "(", Expression, ")"
     | "{", { Statement }, "}"
+    | "if", Expression, Block, [ "else", Block ]
     ;
 
 led = "==", Expression

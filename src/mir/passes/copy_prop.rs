@@ -66,6 +66,7 @@ fn prop_in_terminator(copy_map: &HashMap<LocalId, LocalId>, term: &mut Terminato
     match term {
         Terminator::Goto(_) => {},
         Terminator::Return(op) => prop_in_operand(copy_map, op),
+        Terminator::Branch(op, _, _) => prop_in_operand(copy_map, op),
         Terminator::Unreachable => {},
     }
 }

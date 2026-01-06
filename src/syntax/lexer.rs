@@ -36,6 +36,8 @@ pub enum TokenKind {
     Let,
     True,
     False,
+    If,
+    Else,
 
     // Other
     Newline,
@@ -257,6 +259,8 @@ impl Lexer<'_> {
             "let" => TokenKind::Let,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
+            "if" => TokenKind::If,
+            "else" => TokenKind::Else,
             _ => TokenKind::Identifier,
         };
 

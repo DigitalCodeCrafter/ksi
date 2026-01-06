@@ -86,6 +86,11 @@ impl IRVerifier<'_> {
         match term {
             Terminator::Goto(id) => self.verify_block_id(*id),
             Terminator::Return(op) => self.verify_operand(op),
+            Terminator::Branch(op, then_block, else_block) => {
+                self.verify_operand(op);
+                self.verify_block_id(*then_block);
+                self.verify_block_id(*else_block);
+            }
             Terminator::Unreachable => {}
         }
     }

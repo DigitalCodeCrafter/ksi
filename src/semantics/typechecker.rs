@@ -14,7 +14,6 @@ pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, diagnostic
 pub enum Type {
     Number,
     Bool,
-
     Unit,
 
     Never,
@@ -121,6 +120,38 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
                 }
             }
 
+            r::ExprKind::If { cond, then_branch, else_branch: Some(else_branch) } => {
+                let typed_cond = self.check(*cond, Type::Bool);
+                let typed_then = self.infer(*then_branch);
+                let typed_else = self.check(*else_branch, typed_then.ty.clone());
+                let ty = typed_then.ty.clone();
+
+                t::Expr {
+                    kind: t::ExprKind::If {
+                        cond: Box::new(typed_cond),
+                        then_branch: Box::new(typed_then),
+                        else_branch: Some(Box::new(typed_else))
+                    }, 
+                    span: expr.span, 
+                    ty
+                }
+            }
+
+            r::ExprKind::If { cond, then_branch, else_branch: None } => {
+                let typed_cond = self.check(*cond, Type::Bool);
+                let typed_then = self.check(*then_branch, Type::Unit);
+
+                t::Expr {
+                    kind: t::ExprKind::If {
+                        cond: Box::new(typed_cond),
+                        then_branch: Box::new(typed_then),
+                        else_branch: None
+                    }, 
+                    span: expr.span, 
+                    ty: Type::Unit
+                }
+            }
+
             r::ExprKind::Error(e) => t::Expr {
                 kind: t::ExprKind::Error(e),
                 span: expr.span,
@@ -131,28 +162,37 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
 
     fn check(&mut self, expr: r::Expr, expected: Type) -> t::Expr {
         match expr.kind {
-            r::ExprKind::Block { stmts, tail_expr } => {
+            r::ExprKind::Block { stmts, tail_expr: Some(tail_expr) } => {
                 let typed_stmts: Vec<t::Stmt> = stmts
                     .into_iter()
                     .map(|stmt| self.check_stmt(stmt))
                     .collect();
                 
-                let (ty, typed_expr) = match tail_expr {
-                    Some(expr) => {
-                        let mut typed_expr = self.check(*expr, expected.clone());
-                        typed_expr.ty = self.unify_or_error(typed_expr.span, expected, typed_expr.ty);
-                        (typed_expr.ty.clone(), Some(Box::new(typed_expr)))
-                    }
-                    None => {
-                        let span = typed_stmts.last().map(|s| s.span).unwrap_or(expr.span);
-                        (self.unify_or_error(span, expected, Type::Unit), None)
-                    }
-                };
+                let typed_expr = self.check(*tail_expr, expected.clone());
+                let ty = typed_expr.ty.clone();
 
                 t::Expr {
                     kind: t::ExprKind::Block {
                         stmts: typed_stmts,
-                        tail_expr: typed_expr,
+                        tail_expr: Some(Box::new(typed_expr)),
+                    },
+                    span: expr.span,
+                    ty,
+                }
+            }
+
+            r::ExprKind::If { cond, then_branch, else_branch: Some(else_branch) } => {
+                let typed_cond = self.check(*cond, Type::Bool);
+                let typed_then = self.check(*then_branch, expected.clone());
+                let typed_else = self.check(*else_branch, expected.clone());
+                
+                let ty = self.unify_or_error(expr.span, typed_then.ty.clone(), typed_else.ty.clone());
+
+                t::Expr {
+                    kind: t::ExprKind::If {
+                        cond: Box::new(typed_cond),
+                        then_branch: Box::new(typed_then),
+                        else_branch: Some(Box::new(typed_else))
                     },
                     span: expr.span,
                     ty,

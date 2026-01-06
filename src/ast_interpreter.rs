@@ -115,6 +115,15 @@ fn eval_expr<'a>(expr: &Expr<'a>, env: &Env<'a>) -> Result<Value, EvalError> {
             tail_expr.as_ref().map(|expr| eval_expr(expr, &inner_env)).unwrap_or(Ok(Value::Unit))
         }
 
+        ExprKind::If { cond, then_branch, else_brach } => {
+            let result = eval_expr(cond, env)?;
+            match result {
+                Value::Bool(true) => eval_expr(then_branch, env),
+                Value::Bool(false) => else_brach.as_ref().map(|b| eval_expr(b, env)).unwrap_or(Ok(Value::Unit)),
+                _ => return Err(EvalError::InvalidType(result, Value::Bool(false), expr.span))
+            }
+        }
+
         ExprKind::Error(_) => Err(EvalError::InvalidExpression(expr.span)),
     }
 }

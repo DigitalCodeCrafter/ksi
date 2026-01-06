@@ -39,5 +39,6 @@ pub enum ExprKind {
     UnaryOp { op: UnaryOp, expr: Box<Expr> },
     BinaryOp { op: BinaryOp, left: Box<Expr>, right: Box<Expr> },
     Block { stmts: Vec<Stmt>, tail_expr: Option<Box<Expr>> },
+    If { cond: Box<Expr>, then_branch: Box<Expr>, else_branch: Option<Box<Expr>> },
     Error(ErrorGuaranteed),
 }

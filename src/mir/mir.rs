@@ -21,6 +21,7 @@ pub struct Block {
 #[derive(Debug, PartialEq)]
 pub enum Terminator {
     Goto(BlockId),
+    Branch(Operand, BlockId, BlockId),
     Return(Operand),
     Unreachable,
 }

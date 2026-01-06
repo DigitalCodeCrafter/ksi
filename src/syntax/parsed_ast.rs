@@ -33,6 +33,7 @@ pub enum ExprKind<'a> {
     UnaryOp { op: UnaryOp, expr: Box<Expr<'a>> },
     BinaryOp { op: BinaryOp, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
     Block { stmts: Vec<Stmt<'a>>, tail_expr: Option<Box<Expr<'a>>> },
+    If { cond: Box<Expr<'a>>, then_branch: Box<Expr<'a>>, else_brach: Option<Box<Expr<'a>>> },
     Error(ErrorGuaranteed),
 }
 

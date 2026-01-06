@@ -120,6 +120,42 @@ impl MirBuilder<'_> {
                 }
             }
 
+            t::ExprKind::If { cond, then_branch, else_branch: Some(else_branch) } => {
+                let cond_place = Place { local: self.new_local(expr.ty.clone()), projection: Vec::new() };
+                self.lower_expr(cond_place.clone(), *cond);
+                let then_block = self.new_block();
+                let else_block = self.new_block();
+                let join_block = self.new_block();
+                self.set_terminator(Terminator::Branch(Operand::Move(cond_place), then_block, else_block));
+
+                self.switch_block(then_block);
+                self.lower_expr(dest.clone(), *then_branch);
+                self.set_terminator(Terminator::Goto(join_block));
+
+                self.switch_block(else_block);
+                self.lower_expr(dest, *else_branch);
+                self.set_terminator(Terminator::Goto(join_block));
+
+                self.switch_block(join_block);
+                return;
+            }
+
+            t::ExprKind::If { cond, then_branch, else_branch: None } => {
+                let cond_place = Place { local: self.new_local(expr.ty.clone()), projection: Vec::new() };
+                self.lower_expr(cond_place.clone(), *cond);
+                let then_block = self.new_block();
+                let join_block = self.new_block();
+                self.set_terminator(Terminator::Branch(Operand::Move(cond_place), then_block, join_block));
+
+                self.switch_block(then_block);
+                let fresh = Place { local: self.new_local(then_branch.ty.clone()), projection: Vec::new() };
+                self.lower_expr(fresh, *then_branch);
+                self.set_terminator(Terminator::Goto(join_block));
+                
+                self.switch_block(join_block);
+                RValue::Use(Operand::Const(Const::Unit))
+            }
+
             t::ExprKind::Error(_) => RValue::Poison,
         };
 
@@ -137,6 +173,22 @@ impl MirBuilder<'_> {
     fn emit(&mut self, instr: Instr) {
         let block = &mut self.blocks[self.current_block.0 as usize];
         block.instrs.push(instr);
+    }
+
+    fn set_terminator(&mut self, terminator: Terminator) {
+        let block = &mut self.blocks[self.current_block.0 as usize];
+        block.terminator = terminator;
+    }
+
+    fn switch_block(&mut self, block: BlockId) {
+        assert!((block.0 as usize) < self.blocks.len(), "[Lowerer] Internal error: switched to non-existing block");
+        self.current_block = block;
+    }
+
+    fn new_block(&mut self) -> BlockId {
+        let id = BlockId(self.blocks.len() as u32);
+        self.blocks.push(Block { instrs: vec![], terminator: Terminator::Unreachable });
+        id
     }
 }
 
