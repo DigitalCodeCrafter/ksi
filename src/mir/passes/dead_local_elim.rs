@@ -49,6 +49,7 @@ fn find_live_in_block(used: &mut HashSet<LocalId>, block: &Block) {
 fn find_live_in_rval(used: &mut HashSet<LocalId>, rval: &RValue) {
     match rval {
         RValue::Use(op) => find_live_in_op(used, op),
+        RValue::Unary(_, op) => find_live_in_op(used, op),
         RValue::Binary(_, lhs, rhs) => {
             find_live_in_op(used, lhs);
             find_live_in_op(used, rhs);
@@ -89,6 +90,7 @@ fn remap_in_block(remap: &[Option<LocalId>], block: &mut Block) {
 fn remap_in_rval(remap: &[Option<LocalId>], rval: &mut RValue) {
     match rval {
         RValue::Use(op) => remap_in_op(remap, op),
+        RValue::Unary(_, op) => remap_in_op(remap, op),
         RValue::Binary(_, lhs, rhs) => {
             remap_in_op(remap, lhs);
             remap_in_op(remap, rhs);

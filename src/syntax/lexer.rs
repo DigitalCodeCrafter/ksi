@@ -12,6 +12,17 @@ pub enum TokenKind {
     Star,
     Slash,
     Assign,
+
+    Gt,
+    Eq,
+    Lt,
+    GtEq,
+    LtEq,
+    NotEq,
+    // And,
+    // Or,
+    // Not,
+    
     Dot,
     Semicolon,
 
@@ -23,6 +34,8 @@ pub enum TokenKind {
 
     // Keywords
     Let,
+    True,
+    False,
 
     // Other
     Newline,
@@ -67,6 +80,11 @@ impl<'a> Lexer<'a> {
         if self.pos >= self.input.len() { return None; }
         self.input[self.pos..].chars().next()
     }
+
+    fn peek_n(&self, n: usize) -> Option<char> {
+        if self.pos + n >= self.input.len() { return None; }
+        self.input[self.pos + n..].chars().next()
+    }
 }
 
 impl Lexer<'_> {
@@ -98,7 +116,12 @@ impl Lexer<'_> {
             '-' => return self.single(TokenKind::Minus),
             '*' => return self.single(TokenKind::Star),
             '/' => return self.single(TokenKind::Slash),
-            '=' => return self.single(TokenKind::Assign),
+            '>' => return self.maybe_double('=', TokenKind::Gt, TokenKind::GtEq),
+            '=' => return self.maybe_double('=', TokenKind::Assign, TokenKind::Eq),
+            '<' => return self.maybe_double('=', TokenKind::Gt, TokenKind::GtEq),
+            '!' => return self.double('=', TokenKind::NotEq),
+            // '&' => return self.double('&', TokenKind::And),
+            // '|' => return self.double('|', TokenKind::Or),
             '.' => return self.single(TokenKind::Dot),
             ';' => return self.single(TokenKind::Semicolon),
             '(' => return self.single(TokenKind::LParen),
@@ -132,6 +155,19 @@ impl Lexer<'_> {
         Token { kind, span: Span { start, end: self.pos } }
     }
 
+    fn maybe_double(&mut self, second: char, single: TokenKind, double: TokenKind) -> Token {
+        let start = self.pos;
+        self.advance_char();
+        let kind = if self.peek_char() == Some(second) {
+            self.advance_char(); double
+        } else { single };
+        Token { kind, span: Span { start, end: self.pos } }
+    }
+
+    fn double(&mut self, second: char, kind: TokenKind) -> Token {
+        self.maybe_double(second, TokenKind::Unknown, kind)
+    }
+
     fn skip_whitespace(&mut self) {
         while matches!(self.peek_char(), Some(c) if c.is_whitespace() && c != '\n') {
             self.advance_char();
@@ -139,18 +175,18 @@ impl Lexer<'_> {
     }
 
     fn skip_comment(&mut self) {
-        let save = self.pos;
         if matches!(self.peek_char(), Some('/')) {
-            self.advance_char();
-            match self.peek_char() {
+            match self.peek_n(1) {
                 Some('/') => {
+                    self.advance_char();
                     self.advance_char();
                     while let Some(c) = self.peek_char() {
                         if c == '\n' { break; }
                         self.advance_char();
                     }
-                },
+                }
                 Some('*') => {
+                    self.advance_char();
                     self.advance_char();
                     let mut counter = 1;
                     let mut last_c = ' ';
@@ -163,8 +199,8 @@ impl Lexer<'_> {
                         if counter == 0 { break; }
                         last_c = c;
                     }
-                },
-                _ => self.pos = save
+                }
+                _ => {}
             }
         }
     }
@@ -177,16 +213,10 @@ impl Lexer<'_> {
         }
 
         if matches!(hint, LexHint::Any) {
-            let save = self.pos;
-            if self.peek_char() == Some('.') {
+            if self.peek_char() == Some('.') && matches!(self.peek_n(1), Some(c) if c.is_ascii_digit()) {
                 self.advance_char();
-
-                if matches!(self.peek_char(), Some(c) if c.is_ascii_digit()) {
-                    while matches!(self.peek_char(), Some(c) if c.is_ascii_digit()) {
-                        self.advance_char();
-                    }
-                } else {
-                    self.pos = save;
+                while matches!(self.peek_char(), Some(c) if c.is_ascii_digit()) {
+                    self.advance_char();
                 }
             }
         }
@@ -225,6 +255,8 @@ impl Lexer<'_> {
 
         let kind = match text {
             "let" => TokenKind::Let,
+            "true" => TokenKind::True,
+            "false" => TokenKind::False,
             _ => TokenKind::Identifier,
         };
 

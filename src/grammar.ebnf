@@ -17,11 +17,19 @@ Expression = PrattExpr;
 (* Expression forms *)
 nud = Number
     | Identifier
+    | "true"
+    | "false"
     | "(", Expression, ")"
-    | "{", { Statement }, "}" (* TODO *)
+    | "{", { Statement }, "}"
     ;
 
-led = "+", Expression
+led = "==", Expression
+    | "!=", Expression
+    | "<", Expression
+    | "<=", Expression
+    | ">", Expression
+    | ">=", Expression
+    | "+", Expression
     | "-", Expression
     | "*", Expression
     | "/", Expression

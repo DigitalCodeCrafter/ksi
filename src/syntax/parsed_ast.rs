@@ -1,4 +1,4 @@
-use crate::common::Span;
+use crate::common::{Span, diagnostics::ErrorGuaranteed};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedAst<'a> {
@@ -17,7 +17,7 @@ pub enum StmtKind<'a> {
     Let { name: &'a str, value: Expr<'a> },
     Expr(Expr<'a>),
     Empty,
-    Error,
+    Error(ErrorGuaranteed),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,11 +28,18 @@ pub struct Expr<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind<'a> {
-    Number { value: f64, unit: Option<Unit> },
+    Literal(Literal),
     Identifier { name: &'a str },
+    UnaryOp { op: UnaryOp, expr: Box<Expr<'a>> },
     BinaryOp { op: BinaryOp, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
     Block { stmts: Vec<Stmt<'a>>, tail_expr: Option<Box<Expr<'a>>> },
-    Error,
+    Error(ErrorGuaranteed),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Number { value: f64, unit: Option<Unit> },
+    Bool(bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,4 +54,20 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
+
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+
+    // And,
+    // Or,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnaryOp {
+    // Assign,
+    Neg,
 }

@@ -77,18 +77,19 @@ impl MirBuilder<'_> {
                 self.lower_expr(unused, expr);
             }
             t::StmtKind::Empty => {},
-            t::StmtKind::Error => {},
+            t::StmtKind::Error(_) => {},
         }
     }
 
     fn lower_expr(&mut self, dest: Place, expr: t::Expr) {
         let rval = match expr.kind {
-            t::ExprKind::Number { value, .. } => RValue::Use(Operand::Const(Const::Number(value))),
+            t::ExprKind::Literal(t::Literal::Number { value, .. }) => RValue::Use(Operand::Const(Const::Number(value))),
+            t::ExprKind::Literal(t::Literal::Bool(b)) => RValue::Use(Operand::Const(Const::Bool(b))),
 
             t::ExprKind::Identifier { sym } => match self.env.get(&sym) {
                 Some(&local) => RValue::Use(Operand::Copy(Place { local, projection: Vec::new() })),
                 None => RValue::Poison,
-            },
+            }
 
             t::ExprKind::BinaryOp { op, left, right } => {
                 let l_place = Place { local: self.new_local(left.ty.clone()), projection: Vec::new() };
@@ -97,6 +98,12 @@ impl MirBuilder<'_> {
                 self.lower_expr(r_place.clone(), *right);
 
                 RValue::Binary(op, Operand::Move(l_place), Operand::Move(r_place))
+            }
+
+            t::ExprKind::UnaryOp { op, expr } => {
+                let e_place = Place { local: self.new_local(expr.ty.clone()), projection: Vec::new() };
+                self.lower_expr(e_place.clone(), *expr);
+                RValue::Unary(op, Operand::Move(e_place))
             }
 
             t::ExprKind::Block { stmts, tail_expr } => {
@@ -113,7 +120,7 @@ impl MirBuilder<'_> {
                 }
             }
 
-            t::ExprKind::Error => RValue::Poison,
+            t::ExprKind::Error(_) => RValue::Poison,
         };
 
         self.emit(Instr::Assign(dest, rval));

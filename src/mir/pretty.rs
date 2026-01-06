@@ -3,6 +3,7 @@ use crate::mir::mir::*;
 pub fn format_const(c: &Const) -> String {
     match c {
         Const::Number(n) => n.to_string(),
+        Const::Bool(b) => b.to_string(),
         Const::Unit => "unit".to_string(),
     }
 }
@@ -26,15 +27,30 @@ pub fn format_rval(rv: &RValue) -> String {
 
         RValue::Binary(op, lhs, rhs) => {
             let op_str = match op {
-                BinaryOp::Add => "+",
-                BinaryOp::Sub => "-",
-                BinaryOp::Mul => "*",
-                BinaryOp::Div => "/",
+                BinaryOp::Add   => "+",
+                BinaryOp::Sub   => "-",
+                BinaryOp::Div   => "/",
+                BinaryOp::Mul   => "*",
+                BinaryOp::Gt    => ">",
+                BinaryOp::Ge    => ">=",
+                BinaryOp::Lt    => "<",
+                BinaryOp::Le    => "<=",
+                BinaryOp::Eq    => "==",
+                BinaryOp::Ne    => "!=",
             };
             format!("{} {} {}",
                 format_operand(lhs),
                 op_str,
                 format_operand(rhs)
+            )
+        }
+        RValue::Unary(op, val) => {
+            let op_str = match op {
+                UnaryOp::Neg    => "-"
+            };
+            format!("{}{}",
+                op_str,
+                format_operand(val)
             )
         }
         RValue::Poison => "posion".to_string()

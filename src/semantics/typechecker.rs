@@ -1,4 +1,4 @@
-use crate::common::diagnostics::*;
+use crate::common::{Span, diagnostics::*};
 use crate::semantics::{
     resolver::SymbolTable,
     resolved_ast as r,
@@ -13,9 +13,12 @@ pub fn check(resolved_ast: r::ResolvedAst, symbols: &mut SymbolTable, diagnostic
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Number,
+    Bool,
+
     Unit,
+
     Never,
-    Error,
+    Error(ErrorGuaranteed),
 }
 
 struct TypeChecker<'a, 'd, D: DiagnosticSink> {
@@ -53,7 +56,7 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
             }
             r::StmtKind::Expr(expr) => t::StmtKind::Expr(self.infer(expr)),
             r::StmtKind::Empty => t::StmtKind::Empty,
-            r::StmtKind::Error => t::StmtKind::Error,
+            r::StmtKind::Error(e) => t::StmtKind::Error(e),
         };
 
         t::Stmt { kind, span: stmt.span }
@@ -61,11 +64,17 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
 
     fn infer(&mut self, expr: r::Expr) -> t::Expr {
        match expr.kind {
-            r::ExprKind::Number { value, unit } => t::Expr {
-                kind: t::ExprKind::Number { value, unit },
-                span: expr.span,
-                ty: Type::Number
-            },
+            r::ExprKind::Literal(lit) => {
+                let ty = match lit {
+                    r::Literal::Number { .. } => Type::Number,
+                    r::Literal::Bool(_) => Type::Bool,
+                };
+                t::Expr {
+                    kind: t::ExprKind::Literal(lit),
+                    span: expr.span,
+                    ty,
+                }
+            }
 
             r::ExprKind::Identifier { sym } => {
                 let ty = self.symbols
@@ -79,12 +88,14 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
                     ty,
                 }
             }
-            r::ExprKind::BinaryOp { op, left, right } => {
-                let left = Box::new(self.check(*left, Type::Number));
-                let right = Box::new(self.check(*right, Type::Number));
+
+            r::ExprKind::BinaryOp { op, left, right } => self.infer_binary(expr.span, op, *left, *right),
+
+            r::ExprKind::UnaryOp { op, expr: inner_expr } => {
+                let typed_expr = Box::new(self.check(*inner_expr, Type::Number));
 
                 t::Expr {
-                    kind: t::ExprKind::BinaryOp { op, left, right },
+                    kind: t::ExprKind::UnaryOp { op, expr: typed_expr },
                     span: expr.span,
                     ty: Type::Number,
                 }
@@ -110,8 +121,8 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
                 }
             }
 
-            r::ExprKind::Error => t::Expr {
-                kind: t::ExprKind::Error,
+            r::ExprKind::Error(e) => t::Expr {
+                kind: t::ExprKind::Error(e),
                 span: expr.span,
                 ty: Type::Never
             },
@@ -119,19 +130,118 @@ impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
     }
 
     fn check(&mut self, expr: r::Expr, expected: Type) -> t::Expr {
-        let mut t_expr = self.infer(expr);
+        match expr.kind {
+            r::ExprKind::Block { stmts, tail_expr } => {
+                let typed_stmts: Vec<t::Stmt> = stmts
+                    .into_iter()
+                    .map(|stmt| self.check_stmt(stmt))
+                    .collect();
+                
+                let (ty, typed_expr) = match tail_expr {
+                    Some(expr) => {
+                        let mut typed_expr = self.check(*expr, expected.clone());
+                        typed_expr.ty = self.unify_or_error(typed_expr.span, expected, typed_expr.ty);
+                        (typed_expr.ty.clone(), Some(Box::new(typed_expr)))
+                    }
+                    None => {
+                        let span = typed_stmts.last().map(|s| s.span).unwrap_or(expr.span);
+                        (self.unify_or_error(span, expected, Type::Unit), None)
+                    }
+                };
 
-        if t_expr.ty != expected && !matches!(t_expr.ty, Type::Error | Type::Never) {
-            self.diags.emit(
-                Diagnostic::error("type mismatch")
-                .with_span(t_expr.span)
-                .note(format!("expected type: {:?}", expected))
-                .note(format!("actual type: {:?}", t_expr.ty))
-            );
-            t_expr.ty = Type::Error
+                t::Expr {
+                    kind: t::ExprKind::Block {
+                        stmts: typed_stmts,
+                        tail_expr: typed_expr,
+                    },
+                    span: expr.span,
+                    ty,
+                }
+            }
+
+            _ => {
+                let mut t_expr = self.infer(expr);
+                t_expr.ty = self.unify_or_error(t_expr.span, expected, t_expr.ty);
+                t_expr
+            }
+        }
+    }
+}
+
+impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
+    fn infer_binary(&mut self, span: Span, op: r::BinaryOp, left: r::Expr, right: r::Expr) -> t::Expr {
+        match op {
+            r::BinaryOp::Add
+            | r::BinaryOp::Sub
+            | r::BinaryOp::Mul
+            | r::BinaryOp::Div => {
+                let left = Box::new(self.check(left, Type::Number));
+                let right = Box::new(self.check(right, Type::Number));
+        
+                t::Expr {
+                    kind: t::ExprKind::BinaryOp { op, left, right },
+                    span,
+                    ty: Type::Number,
+                }
+            }
+
+            r::BinaryOp::Ge
+            | r::BinaryOp::Gt
+            | r::BinaryOp::Le
+            | r::BinaryOp::Lt => {
+                let left = Box::new(self.check(left, Type::Number));
+                let right = Box::new(self.check(right, Type::Number));
+        
+                t::Expr {
+                    kind: t::ExprKind::BinaryOp { op, left, right },
+                    span,
+                    ty: Type::Bool,
+                }
+            }
+
+            r::BinaryOp::Eq
+            | r::BinaryOp::Ne => {
+                let left = Box::new(self.infer(left));
+                let right = Box::new(self.check(right, left.ty.clone()));
+        
+                t::Expr {
+                    kind: t::ExprKind::BinaryOp { op, left, right },
+                    span,
+                    ty: Type::Bool,
+                }
+            },
         }
 
-        t_expr
+    }
+}
+
+impl<D: DiagnosticSink> TypeChecker<'_, '_, D> {
+    fn unify(a: Type, b: Type) -> Option<Type> {
+        use Type::*;
+        match (a, b) {
+            (Error(_), t) | (t, Error(_)) => Some(t),
+            (Never, t) | (t, Never) => Some(t),
+
+            (Number, Number) => Some(Number),
+            (Bool, Bool) => Some(Bool),
+
+            _ => None,
+        }
+    }
+
+    fn unify_or_error(&mut self, span: Span, expected: Type, actual: Type) -> Type {
+        match Self::unify(expected.clone(), actual.clone()) {
+            Some(ty) => ty,
+            None => {
+                let e = self.diags.emit(
+                    Diagnostic::error("type mismatch")
+                    .with_span(span)
+                    .note(format!("expected type: {:?}", expected))
+                    .note(format!("actual type: {:?}", actual))
+                );
+                Type::Error(e)
+            }
+        }
     }
 }
 

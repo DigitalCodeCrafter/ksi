@@ -1,5 +1,5 @@
 use crate::{common::Span, mir::{BlockId, LocalId}, semantics::Type};
-pub use crate::semantics::typed_ast::BinaryOp;
+pub use crate::semantics::typed_ast::{BinaryOp, UnaryOp};
 
 #[derive(Debug, PartialEq)]
 pub struct Body {
@@ -34,6 +34,7 @@ pub enum Instr {
 #[derive(Debug, PartialEq)]
 pub enum RValue {
     Use(Operand),
+    Unary(UnaryOp, Operand),
     Binary(BinaryOp, Operand, Operand),
     Poison,
 }
@@ -59,6 +60,7 @@ pub enum Projection {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Const {
     Number(f64),
+    Bool(bool),
     Unit,
 }
 

@@ -58,18 +58,22 @@ impl Diagnostic {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ErrorGuaranteed(());
+
 pub trait DiagnosticSink {
-    fn emit(&mut self, diagnostic: Diagnostic);
+    fn emit(&mut self, diagnostic: Diagnostic) -> ErrorGuaranteed;
 }
 
 pub mod sinks {
-    use super::{Diagnostic, DiagnosticSink, Severity};
+    use super::{Diagnostic, DiagnosticSink, Severity, ErrorGuaranteed};
     pub struct Diagnostics {
         pub diagnostics: Vec<Diagnostic>,
     }
     impl DiagnosticSink for Diagnostics {
-        fn emit(&mut self, diagnostic: Diagnostic) {
+        fn emit(&mut self, diagnostic: Diagnostic) -> ErrorGuaranteed {
             self.diagnostics.push(diagnostic);
+            ErrorGuaranteed(())
         }
     }
     impl Diagnostics {
@@ -84,15 +88,18 @@ pub mod sinks {
 
     pub struct IgnoreErrors;
     impl DiagnosticSink for IgnoreErrors {
-        fn emit(&mut self, _: Diagnostic) {}
+        fn emit(&mut self, _: Diagnostic) -> ErrorGuaranteed {
+            ErrorGuaranteed(())
+        }
     }
 
     pub struct AssertErrors;
     impl DiagnosticSink for AssertErrors {
-        fn emit(&mut self, diagnostic: Diagnostic) {
+        fn emit(&mut self, diagnostic: Diagnostic) -> ErrorGuaranteed {
             if diagnostic.severity == Severity::Error {
                 panic!("[AssertErrors] Error: {:?}", diagnostic)
             }
+            ErrorGuaranteed(())
         }
     }
 }

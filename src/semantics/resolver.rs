@@ -199,7 +199,7 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
             }
             p::StmtKind::Expr(expr) => r::StmtKind::Expr(self.resolve_expr(expr)),
             p::StmtKind::Empty => r::StmtKind::Empty,
-            p::StmtKind::Error => r::StmtKind::Error,
+            p::StmtKind::Error(e) => r::StmtKind::Error(e),
         };
 
         r::Stmt { kind, span: stmt.span }
@@ -207,17 +207,20 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
 
     fn resolve_expr(&mut self, expr: p::Expr) -> r::Expr {
         let kind = match expr.kind {
-            p::ExprKind::Number { value, unit } => r::ExprKind::Number { value, unit },
+            p::ExprKind::Literal(lit) => r::ExprKind::Literal(lit),
             p::ExprKind::Identifier { name } => {
                 match self.resolve_ident(name, expr.span) {
-                    Some(sym) => r::ExprKind::Identifier { sym },
-                    None => r::ExprKind::Error,
+                    Ok(sym) => r::ExprKind::Identifier { sym },
+                    Err(e) => r::ExprKind::Error(e),
                 }
             }
             p::ExprKind::BinaryOp { op, left, right } => {
                 let left = Box::new(self.resolve_expr(*left));
                 let right = Box::new(self.resolve_expr(*right));
                 r::ExprKind::BinaryOp { op, left, right }
+            }
+            p::ExprKind::UnaryOp { op, expr } => {
+                r::ExprKind::UnaryOp { op, expr: Box::new(self.resolve_expr(*expr)) }
             }
             p::ExprKind::Block { stmts, tail_expr } => {
                 let outer = self.current_scope;
@@ -237,13 +240,13 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                 self.current_scope = outer;
                 r::ExprKind::Block { stmts: resolved_stmts, tail_expr: resolved_expr }
             }
-            p::ExprKind::Error => r::ExprKind::Error,
+            p::ExprKind::Error(e) => r::ExprKind::Error(e),
         };
 
         r::Expr { kind, span: expr.span }
     }
 
-    fn resolve_ident(&mut self, name: &str, span: Span) -> Option<SymbolId> {
+    fn resolve_ident(&mut self, name: &str, span: Span) -> Result<SymbolId, ErrorGuaranteed> {
         let mut scope = self.current_scope;
         let mut first = None;
         loop {
@@ -260,7 +263,7 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                             Some(p) => p,
                             None => {
                                 let sym_span = self.symbols.get(first.unwrap()).def_span;
-                                self.diags.emit(
+                                let e =self.diags.emit(
                                     Diagnostic::error("use of variable before its definition")
                                     .with_span(span)
                                     .with_label(Label::primary(span))
@@ -269,21 +272,21 @@ impl<'d, D: DiagnosticSink> Resolver<'d, D> {
                                         "variable defined here",
                                     ))
                                 );
-                                return None;
+                                return Err(e);
                             }
                         };
                         continue;
                     }
 
-                    return Some(sym);
+                    return Ok(sym);
                 }
                 None => {
-                    self.diags.emit(
+                    let e = self.diags.emit(
                         Diagnostic::error("use of undeclared variable")
                         .with_span(span)
                         .with_label(Label::primary(span))
                     );
-                    return None;
+                    return Err(e);
                 }
             }
         }
@@ -306,7 +309,7 @@ mod tests {
                     kind: p::StmtKind::Let {
                         name: "x",
                         value: p::Expr {
-                            kind: p::ExprKind::Number { value: 2.0, unit: None },
+                            kind: p::ExprKind::Literal(p::Literal::Number { value: 2.0, unit: None }),
                             span: Span::new(8, 9)
                         }
                     },
@@ -333,7 +336,7 @@ mod tests {
                     kind: r::StmtKind::Let {
                         sym: SymbolId(0),
                         value: r::Expr {
-                            kind: r::ExprKind::Number { value: 2.0, unit: None },
+                            kind: r::ExprKind::Literal(r::Literal::Number { value: 2.0, unit: None }),
                             span: Span::new(8, 9)
                         }
                     },

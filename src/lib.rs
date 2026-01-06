@@ -5,4 +5,5 @@ pub mod semantics;
 pub mod mir;
 pub mod backend;
 
-pub mod interpreter;
+pub mod ast_interpreter;
+pub mod mir_interpreter;

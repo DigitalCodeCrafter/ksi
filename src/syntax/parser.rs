@@ -103,12 +103,12 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
             TokenKind::Semicolon => Stmt { kind: StmtKind::Empty, span: self.next_token().span },
             _ => {
                 let tok = self.next_token();
-                self.diags.emit(
+                let e = self.diags.emit(
                     Diagnostic::error("invalid start of statement")
                     .with_span(tok.span)
                     .note("expected 'let' or an expression")
                 );
-                return Stmt { kind: StmtKind::Error, span: tok.span };
+                return Stmt { kind: StmtKind::Error(e), span: tok.span };
             }
         }
     }
@@ -119,14 +119,14 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         let ident_token = match self.next_token() {
             ident @ Token { kind: TokenKind::Identifier, .. }=> ident,
             other => {
-                self.diags.emit(
+                let e = self.diags.emit(
                     Diagnostic::error("expected an identifier after 'let'")
                     .with_span(other.span)
                     .with_label(Label::secondary(let_kw.span, "'let' starts a variable declaration"))
                 );
 
                 self.recover_to_stmt_start();
-                return Stmt { kind: StmtKind::Error, span: let_kw.span }
+                return Stmt { kind: StmtKind::Error(e), span: let_kw.span }
             }
         };
 
@@ -135,14 +135,14 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         match self.next_token() {
             Token { kind: TokenKind::Assign, .. } => {}
             other => {
-                self.diags.emit(
+                let e = self.diags.emit(
                     Diagnostic::error("expected '=' after variable name")
                     .with_span(other.span)
                     .note("a 'let' statement must assign an initial value")
                     .with_label(Label::secondary(ident_token.span, "variable declared here"))
                 );
                 self.recover_to_stmt_start();
-                return Stmt { kind: StmtKind::Error, span: let_kw.span.concat(&ident_token.span) }
+                return Stmt { kind: StmtKind::Error(e), span: let_kw.span.concat(&ident_token.span) }
             }
         }
 
@@ -208,6 +208,12 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
 
 // Expressions
 
+// led power table
+// ==, !=       => 2, 3
+// <, <=, >, >= => 4, 5
+// +, -         => 6, 7
+// *, /         => 8, 9
+
 impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_expression(&mut self, rbp: u8) -> Expr<'a> {
         let revert_point = self.stream.get_position();
@@ -221,12 +227,12 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
                 Some(nud) => nud,
                 None => {
                     self.stream.set_position(revert_point);
-                    self.diags.emit(
+                    let e = self.diags.emit(
                         Diagnostic::error("Expected expression")
                         .with_span(token.span)
                         .note("expected a literal, identifier, or '('")
                     );
-                    return Expr { kind: ExprKind::Error, span: token.span };
+                    return Expr { kind: ExprKind::Error(e), span: token.span };
                 }
             };
 
@@ -258,25 +264,38 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     }
 
     fn get_op(kind: TokenKind) -> Operator<'a, 'd, D> {
-        use TokenKind::*;
+        use TokenKind as k;
         match kind {
-            Identifier  => Operator::nud_op(Self::parse_var),
-            Number      => Operator::nud_op(Self::parse_number),
-            Plus        => Operator::led_op(2, Self::parse_binary_op),
-            Minus       => Operator { lbp: 2, nud: None, led: Some(Self::parse_binary_op) },
-            Star        => Operator::led_op(4, Self::parse_binary_op),
-            Slash       => Operator::led_op(4, Self::parse_binary_op),
-            Assign      => Operator::not_an_op(), // TODO
-            Dot         => Operator::not_an_op(), // TODO
-            Semicolon   => Operator::not_an_op(),
-            LParen      => Operator::nud_op(Self::parse_parathesised),
-            RParen      => Operator::not_an_op(),
-            LBrace      => Operator::nud_op(Self::parse_block),
-            RBrace      => Operator::not_an_op(),
-            Let         => Operator::not_an_op(),
-            Newline     => Operator::not_an_op(),
-            Unknown     => Operator::not_an_op(),
-            EOF         => Operator::not_an_op(),
+            k::Identifier  => Operator::nud_op(Self::parse_var),
+            k::Number      => Operator::nud_op(Self::parse_number),
+            k::True        => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(true)), span: t.span }),
+            k::False       => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(false)), span: t.span }),
+
+            k::Plus        => Operator::led_op(4, Self::parse_binary_op),
+            k::Minus       => Operator { lbp: 4, nud: Some(Self::parse_unary_op), led: Some(Self::parse_binary_op) },
+            k::Star        => Operator::led_op(8, Self::parse_binary_op),
+            k::Slash       => Operator::led_op(8, Self::parse_binary_op),
+
+            k::Gt          => Operator::led_op(4, Self::parse_binary_op),
+            k::Lt          => Operator::led_op(4, Self::parse_binary_op),
+            k::GtEq        => Operator::led_op(4, Self::parse_binary_op),
+            k::LtEq        => Operator::led_op(4, Self::parse_binary_op),
+            k::Eq          => Operator::led_op(2, Self::parse_binary_op),
+            k::NotEq       => Operator::led_op(2, Self::parse_binary_op),
+            // And         => Operator::led_op(0, Self::parse_binary_op),
+            // Or          => Operator::led_op(0, Self::parse_binary_op),
+
+            k::Assign      => Operator::not_an_op(), // TODO
+            k::Dot         => Operator::not_an_op(), // TODO
+            k::Semicolon   => Operator::not_an_op(),
+            k::LParen      => Operator::nud_op(Self::parse_parathesised),
+            k::RParen      => Operator::not_an_op(),
+            k::LBrace      => Operator::nud_op(Self::parse_block),
+            k::RBrace      => Operator::not_an_op(),
+            k::Let         => Operator::not_an_op(),
+            k::Newline     => Operator::not_an_op(),
+            k::Unknown     => Operator::not_an_op(),
+            k::EOF         => Operator::not_an_op(),
         }
     }
 
@@ -289,16 +308,24 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
     fn parse_number(&mut self, tok: Token) -> Expr<'a> {
         let num_str = &self.stream.get_src()[tok.span.start..tok.span.end];
 
-        Expr { kind: ExprKind::Number { value: num_str.parse().unwrap(), unit: None }, span: tok.span }
+        Expr { kind: ExprKind::Literal(Literal::Number { value: num_str.parse().unwrap(), unit: None }), span: tok.span }
     }
 
     fn parse_binary_op(&mut self, lhs: Expr<'a>, tok: Token) -> Expr<'a> {
         let (op, rbp) = match tok.kind {
             // TokenKind::Assign   => (BinaryOp::Assign, 0),
-            TokenKind::Plus     => (BinaryOp::Add, 3),
-            TokenKind::Minus    => (BinaryOp::Sub, 3),
-            TokenKind::Star     => (BinaryOp::Mul, 5),
-            TokenKind::Slash    => (BinaryOp::Div, 5),
+            TokenKind::Plus     => (BinaryOp::Add, 7),
+            TokenKind::Minus    => (BinaryOp::Sub, 7),
+            TokenKind::Star     => (BinaryOp::Mul, 9),
+            TokenKind::Slash    => (BinaryOp::Div, 9),
+
+            TokenKind::Gt       => (BinaryOp::Gt, 5),
+            TokenKind::GtEq     => (BinaryOp::Ge, 5),
+            TokenKind::Lt       => (BinaryOp::Lt, 5),
+            TokenKind::LtEq     => (BinaryOp::Le, 5),
+            TokenKind::Eq       => (BinaryOp::Eq, 3),
+            TokenKind::NotEq    => (BinaryOp::Ne, 3),
+
             _ => unimplemented!("Unsupported binary operator")
         };
 
@@ -306,6 +333,18 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
         let span = lhs.span.concat(&rhs.span);
 
         Expr { kind: ExprKind::BinaryOp { op, left: Box::new(lhs), right: Box::new(rhs) }, span }
+    }
+
+    fn parse_unary_op(&mut self, tok: Token) -> Expr<'a> {
+        let (op, rbp) = match tok.kind {
+            TokenKind::Minus    => (UnaryOp::Neg, 10),
+            _ => unimplemented!("Unsupported unary operator")
+        };
+
+        let expr = self.parse_expression(rbp);
+        let span = tok.span.concat(&expr.span);
+
+        Expr { kind: ExprKind::UnaryOp { op, expr: Box::new(expr) }, span }
     }
 
     fn parse_parathesised(&mut self, tok: Token) -> Expr<'a> {
@@ -394,16 +433,16 @@ mod tests {
         let expected = Expr {
             kind: ExprKind::BinaryOp {
                 op: BinaryOp::Add,
-                left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(0, 1) }),
+                left: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(0, 1) }),
                 right: Box::new(Expr {
                     kind: ExprKind::BinaryOp {
                         op: BinaryOp::Mul,
-                        left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(4, 5) }),
+                        left: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(4, 5) }),
                         right: Box::new(Expr {
                             kind: ExprKind::BinaryOp {
                                 op: BinaryOp::Sub,
-                                left: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(9, 10) }),
-                                right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) })
+                                left: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 4.0, unit: None }), span: Span::new(9, 10) }),
+                                right: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(13, 14) })
                             },
                             span: Span::new(8, 15)
                         })
@@ -436,7 +475,7 @@ let a = x + 2\r
                 Stmt {
                     kind: StmtKind::Let {
                         name: "x",
-                        value: Expr { kind: ExprKind::Number { value: 0.0, unit: None }, span: Span::new(10, 11) }
+                        value: Expr { kind: ExprKind::Literal(Literal::Number { value: 0.0, unit: None }), span: Span::new(10, 11) }
                     },
                     span: Span::new(2, 12)
                 },
@@ -447,12 +486,12 @@ let a = x + 2\r
                             left: Box::new(Expr {
                                 kind: ExprKind::BinaryOp {
                                     op: BinaryOp::Add,
-                                    left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(13, 14) }),
-                                    right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(17, 18) }),
+                                    left: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(13, 14) }),
+                                    right: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(17, 18) }),
                                 },
                                 span: Span::new(13, 18)
                             }),
-                            right: Box::new(Expr { kind: ExprKind::Number { value: 4.0, unit: None }, span: Span::new(22, 23) })
+                            right: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 4.0, unit: None }), span: Span::new(22, 23) })
                         },
                         span: Span::new(13, 23),
                     }),
@@ -465,7 +504,7 @@ let a = x + 2\r
                             kind: ExprKind::BinaryOp {
                                 op: BinaryOp::Add,
                                 left: Box::new(Expr { kind: ExprKind::Identifier { name: "x" }, span: Span::new(33, 34) }),
-                                right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(37, 38) })
+                                right: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(37, 38) })
                             },
                             span: Span::new(33, 38)
                         }
@@ -476,8 +515,8 @@ let a = x + 2\r
                     kind: StmtKind::Expr(Expr {
                         kind: ExprKind::BinaryOp {
                             op: BinaryOp::Add,
-                            left: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(40, 41) }),
-                            right: Box::new(Expr { kind: ExprKind::Number { value: 2.0, unit: None }, span: Span::new(45, 46) })
+                            left: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(40, 41) }),
+                            right: Box::new(Expr { kind: ExprKind::Literal(Literal::Number { value: 2.0, unit: None }), span: Span::new(45, 46) })
                         },
                         span: Span::new(40, 46)
                     }),

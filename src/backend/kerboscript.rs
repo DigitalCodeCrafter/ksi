@@ -24,6 +24,8 @@ impl KosEmitter {
     fn emit_const(&mut self, c: &Const) {
         match c {
             Const::Number(n) => self.out.push_str(&n.to_string()),
+            Const::Bool(true) => self.out.push_str("true"),
+            Const::Bool(false) => self.out.push_str("false"),
             Const::Unit => self.out.push_str("0"),
         }
     }
@@ -43,12 +45,26 @@ impl KosEmitter {
         match rval {
             RValue::Use(op) => self.emit_operand(op),
 
+            RValue::Unary(op, val) => {
+                let op_str = match op {
+                    UnaryOp::Neg => "-",
+                };
+                self.emit(op_str);
+                self.emit_operand(val);
+            }
+
             RValue::Binary(op, lhs, rhs) => {
                 let op_str = match op {
                     BinaryOp::Add => " + ",
                     BinaryOp::Sub => " - ",
                     BinaryOp::Mul => " * ",
                     BinaryOp::Div => " / ",
+                    BinaryOp::Gt => " > ",
+                    BinaryOp::Ge => " >= ",
+                    BinaryOp::Lt => " < ",
+                    BinaryOp::Le => " <= ",
+                    BinaryOp::Eq => " == ",
+                    BinaryOp::Ne => " <> ",
                 };
                 self.emit_operand(lhs);
                 self.emit(op_str);

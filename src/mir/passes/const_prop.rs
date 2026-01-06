@@ -42,6 +42,7 @@ fn prop_in_instr(const_map: &mut HashMap<LocalId, Const>, instr: &mut Instr) {
 fn prop_in_rval(const_map: &HashMap<LocalId, Const>, rval: &mut RValue) {
     match rval {
         RValue::Use(op) => prop_in_operand(const_map, op),
+        RValue::Unary(_, op) => prop_in_operand(const_map, op),
         RValue::Binary(_, lhs, rhs) => {
             prop_in_operand(const_map, lhs);
             prop_in_operand(const_map, rhs);

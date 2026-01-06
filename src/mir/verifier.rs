@@ -57,6 +57,8 @@ impl IRVerifier<'_> {
         match rval {
             RValue::Use(op) => self.verify_operand(op),
 
+            RValue::Unary(_, op) => self.verify_operand(op),
+
             RValue::Binary(_, lhs, rhs) => {
                 self.verify_operand(lhs);
                 self.verify_operand(rhs);

@@ -1,5 +1,5 @@
-use crate::common::Span;
-pub use crate::semantics::resolved_ast::{Unit, BinaryOp};
+use crate::common::{Span, diagnostics::ErrorGuaranteed};
+pub use crate::semantics::resolved_ast::{Unit, BinaryOp, UnaryOp, Literal};
 use crate::semantics::{
     resolver::SymbolId,
     typechecker::Type,
@@ -22,7 +22,7 @@ pub enum StmtKind {
     Let { sym: SymbolId, value: Expr },
     Expr(Expr),
     Empty,
-    Error,
+    Error(ErrorGuaranteed),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,9 +34,10 @@ pub struct Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
-    Number { value: f64, unit: Option<Unit> },
+    Literal(Literal),
     Identifier { sym: SymbolId },
+    UnaryOp { op: UnaryOp, expr: Box<Expr> },
     BinaryOp { op: BinaryOp, left: Box<Expr>, right: Box<Expr> },
     Block { stmts: Vec<Stmt>, tail_expr: Option<Box<Expr>> },
-    Error,
+    Error(ErrorGuaranteed),
 }
