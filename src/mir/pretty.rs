@@ -46,7 +46,7 @@ pub fn format_rval(rv: &RValue) -> String {
         }
         RValue::Unary(op, val) => {
             let op_str = match op {
-                UnaryOp::Neg    => "-"
+                UnaryOp::Neg    => "- "
             };
             format!("{}{}",
                 op_str,

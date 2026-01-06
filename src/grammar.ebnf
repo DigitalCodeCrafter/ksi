@@ -19,6 +19,7 @@ nud = Number
     | Identifier
     | "true"
     | "false"
+    | "-", Expression
     | "(", Expression, ")"
     | "{", { Statement }, "}"
     ;
