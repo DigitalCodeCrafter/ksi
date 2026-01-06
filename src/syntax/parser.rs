@@ -271,8 +271,8 @@ impl<'a, 'd, D: DiagnosticSink> Parser<'a, 'd, D> {
             k::True        => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(true)), span: t.span }),
             k::False       => Operator::nud_op(|_, t| Expr { kind: ExprKind::Literal(Literal::Bool(false)), span: t.span }),
 
-            k::Plus        => Operator::led_op(4, Self::parse_binary_op),
-            k::Minus       => Operator { lbp: 4, nud: Some(Self::parse_unary_op), led: Some(Self::parse_binary_op) },
+            k::Plus        => Operator::led_op(6, Self::parse_binary_op),
+            k::Minus       => Operator { lbp: 6, nud: Some(Self::parse_unary_op), led: Some(Self::parse_binary_op) },
             k::Star        => Operator::led_op(8, Self::parse_binary_op),
             k::Slash       => Operator::led_op(8, Self::parse_binary_op),
 
