@@ -118,7 +118,7 @@ impl Lexer<'_> {
             '/' => return self.single(TokenKind::Slash),
             '>' => return self.maybe_double('=', TokenKind::Gt, TokenKind::GtEq),
             '=' => return self.maybe_double('=', TokenKind::Assign, TokenKind::Eq),
-            '<' => return self.maybe_double('=', TokenKind::Gt, TokenKind::GtEq),
+            '<' => return self.maybe_double('=', TokenKind::Lt, TokenKind::LtEq),
             '!' => return self.double('=', TokenKind::NotEq),
             // '&' => return self.double('&', TokenKind::And),
             // '|' => return self.double('|', TokenKind::Or),
